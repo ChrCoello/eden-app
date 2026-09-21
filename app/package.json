@@ -6,13 +6,18 @@
     "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview --host",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:rules": "firebase emulators:exec --project demo-eden --only firestore \"vitest run --config vitest.rules.config.js\"",
+    "deploy:rules": "firebase deploy --only firestore:rules"
   },
   "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "firebase-tools": "^15.30.2",
     "vite": "^6.4.3",
     "vitest": "^3.2.7"
   },
   "dependencies": {
+    "firebase": "^12.19.0",
     "polylabel": "^2.1.0"
   }
 }

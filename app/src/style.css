@@ -9,6 +9,9 @@
   --lawn: #d6e9c6;
   --path: #c8a27a;
   --selected: #e08a00;
+  --water: #2f7fd1;
+  --line: #c9d3c6;
+  --error: #b3261e;
   --shadow: 0 -4px 24px rgb(0 0 0 / 0.15);
   color-scheme: light dark;
 }
@@ -23,6 +26,9 @@
     --zone-edge: #121a14;
     --lawn: #2a3d2d;
     --path: #7a5f45;
+    --water: #4b9be6;
+    --line: #3a4a3d;
+    --error: #ff8a80;
     --shadow: 0 -4px 24px rgb(0 0 0 / 0.5);
   }
 }
@@ -100,4 +106,90 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
   background: none;
   color: var(--muted);
   font-size: 28px;
+}
+
+/* ---- zone sheet: latest watering + drop button ---- */
+#sheet { padding-right: 96px; }   /* keep text clear of the drop button */
+#last-watering { font-weight: 600; }
+#water {
+  position: absolute;
+  right: 16px;
+  bottom: calc(env(safe-area-inset-bottom) + 16px);
+  width: 64px;
+  height: 64px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--water);
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+}
+#water svg { width: 34px; height: 34px; fill: #fff; }
+#water:active { transform: scale(0.94); }
+
+/* ---- forms: watering dialog + garden code gate ---- */
+dialog {
+  width: min(92vw, 400px);
+  border: 0;
+  border-radius: 16px;
+  padding: 20px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 8px 40px rgb(0 0 0 / 0.3);
+}
+dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+dialog h3 { margin: 0 0 12px; font-size: 20px; }
+label { display: block; margin: 12px 0 4px; font-size: 14px; color: var(--muted); }
+input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font: inherit;
+  font-size: 17px;   /* ≥ 16px: iOS doesn't zoom into the field */
+}
+.actions { display: flex; gap: 12px; margin-top: 20px; }
+.actions button, #gate button {
+  flex: 1;
+  min-height: 48px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+}
+.actions .primary, #gate .primary { background: var(--brand); border-color: var(--brand); color: #fff; }
+button:disabled { opacity: 0.5; }
+.error { min-height: 1.2em; margin: 8px 0 0; color: var(--error); font-size: 14px; }
+
+#gate {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: var(--bg);
+  z-index: 10;
+}
+#gate[hidden] { display: none; }
+#gate form { width: min(100%, 400px); }
+#gate h2 { margin: 0 0 8px; font-size: 32px; color: var(--brand); }
+#gate button { width: 100%; margin-top: 16px; }
+
+#toast {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top) + 64px);
+  transform: translateX(-50%);
+  max-width: calc(100vw - 32px);
+  margin: 0;
+  padding: 10px 16px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 15px;
+  box-shadow: 0 2px 10px rgb(0 0 0 / 0.25);
+  z-index: 20;
 }

@@ -1,0 +1,37 @@
+rules_version = '2';
+
+// The garden code is the id of a gardens/{code} document, created once by hand in the
+// Firebase console. Knowing the code is what gives access; it's never listable.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function gardenExists(code) {
+      return exists(/databases/$(database)/documents/gardens/$(code));
+    }
+
+    function validWatering() {
+      let w = request.resource.data;
+      return w.keys().hasOnly(["zone", "by", "day", "at"])
+        && w.keys().hasAll(["zone", "by", "day", "at"])
+        && w.zone is string && w.zone.matches("^[A-Za-z0-9_]{1,20}$")
+        && w.by is string && w.by.size() >= 1 && w.by.size() <= 40
+        && w.day is string && w.day.matches("^[0-9]{4}-[0-9]{2}-[0-9]{2}$")
+        && w.at == request.time;
+    }
+
+    match /gardens/{code} {
+      allow get: if signedIn();          // "does this code exist?"
+      allow list, write: if false;
+
+      match /waterings/{id} {
+        allow read: if signedIn() && gardenExists(code);
+        allow create: if signedIn() && gardenExists(code) && validWatering();
+        allow update, delete: if false;
+      }
+    }
+  }
+}

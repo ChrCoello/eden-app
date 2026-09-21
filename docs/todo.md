@@ -47,7 +47,10 @@ Source: `data/20260303_154351.PDF`, a scan (6900×8827 px JPEG) of the surveyor'
 - Phone web app, installable on the home screen (PWA manifest + icon). **Online-only**:
   there's mobile signal everywhere in the garden.
 - Watering logs synced between everyone who uses the app, live.
-- Identity: enter a shared **garden code** once, then pick your name. No passwords.
+- Identity: enter a shared **garden code** once per phone. No passwords, no accounts.
+- Watering flow (user's design): tap a zone → latest watering (day, who) + 💧 button → form with
+  **Nom** (pre-filled with the last name used on that phone, suggestions from names already used)
+  and **Jour** (default today) → OK / Annuler. Anyone with the code can use any name.
 - Repo stays public → hosted on **GitHub Pages** (deployed by a GitHub Action).
 - Backend: **Firebase Firestore** + anonymous auth. No server code, live listeners, free tier
   that never pauses (Supabase free projects pause after a week idle, e.g. in winter).
@@ -55,14 +58,14 @@ Source: `data/20260303_154351.PDF`, a scan (6900×8827 px JPEG) of the surveyor'
 ### Data model (Firestore)
 
 ```
-gardens/{gardenCode}                      { members: ["Papa", "Chris", ...] }
-gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", at: serverTimestamp }
+gardens/{gardenCode}                      { name: "Eden" }   (created once by hand in the console)
+gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-09-21", at: serverTimestamp }
 ```
-- The garden code is the secret: security rules only allow signed-in (anonymous) users to
-  read/write under a garden document that exists; the code is never listed. Good enough for a family app.
-- "Last watered" per zone is computed client-side from a live query on the last 60 days
-  (35 zones × a few waterings/day, so small).
-- Undo = delete the watering doc (only your own, only within a few minutes: enforced in rules).
+- The garden code is the secret (never committed, the repo is public): rules (`app/firestore.rules`)
+  only allow signed-in (anonymous) users to read/add waterings under a garden document that exists;
+  codes can't be listed; waterings are validated and can't be edited or deleted.
+- "Last watered" per zone = latest `day` (then latest `at`), computed client-side from a live
+  query on the last 365 days.
 
 ### Stack
 
@@ -74,19 +77,23 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", at: serverTi
 
 ### Steps
 
-- [x] 2.1 (User) Firebase project `digital-eden-31820` created; web config in `app/src/firebase-config.js`.
-      Still to confirm: Firestore created + Anonymous auth enabled; garden code; list of names.
+- [x] 2.1 (User) Firebase project `digital-eden-31820`: Firestore + Anonymous auth enabled;
+      web config in `app/src/firebase-config.js`. Garden code chosen (not in the repo).
 - [x] 2.2 `app/`: Vite 6 + Vitest 3 (they support local Node 20.11; CI uses Node 22), PWA manifest +
       icons (`tools/make_icons.py`), `.github/workflows/deploy.yml` (test → build → Pages).
       Live at https://chrcoello.github.io/eden-app/ (Pages source: GitHub Actions; deploys on push to main).
 - [x] 2.3 Map screen (French UI): SVG from `garden.json`, pan, pinch-zoom, wheel zoom, tap → zone sheet
       (id, name, area), "Plan" toggles the scan underneath, "Tout voir" re-fits, dark mode.
       Checked in headless Chrome on a 390×844 touch viewport: taps hit the right zone, pan ≠ tap, pinch zooms.
-- [ ] 2.4 First launch: garden code + pick/add your name (remembered on the phone).
-- [ ] 2.5 Firestore: live waterings listener, "Watered now" button, 10 s undo toast.
+- [x] 2.4 First launch: "Code du jardin" screen, checked against Firestore, remembered on the phone.
+- [x] 2.5 Zone sheet shows the latest watering; 💧 → Nom / Jour form → OK / Annuler; live sync.
+      Tested end-to-end in a phone viewport against an in-memory backend (`vite --mode fake`).
+- [ ] 2.5b (User + me) Deploy the rules (`npm run deploy:rules`, needs `firebase login`) and create
+      the garden document in the console. Then test with the real Firestore.
 - [ ] 2.6 Coloring by days since last watered (today / 1–2 d / 3–6 d / 7+ d / never) + legend.
-- [ ] 2.7 Zone sheet: name, last watered by whom and when, recent history.
-- [ ] 2.8 Security rules + emulator tests; unit tests; Playwright phone smoke test.
+- [ ] 2.7 Zone sheet: recent history (latest watering already shown).
+- [ ] 2.8 Rules tests written (`app/rules/`, run in CI with Java 21: can't run locally, Java 11 here);
+      unit tests done (55); Playwright phone smoke test still to add to the repo.
 - [ ] 2.9 Deploy, then test on a real phone with you (and Dad).
 
 ### Later (not in the first version)

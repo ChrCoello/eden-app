@@ -22,8 +22,41 @@
     <button id="close" aria-label="Fermer">×</button>
     <h2 id="zone-id"></h2>
     <p id="zone-name"></p>
+    <p id="last-watering"></p>
     <p id="zone-area" class="muted"></p>
+    <button id="water" aria-label="Ajouter un arrosage" title="Ajouter un arrosage">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 2.5Z"/></svg>
+    </button>
   </section>
+
+  <dialog id="water-dialog">
+    <form id="water-form" method="dialog">
+      <h3 id="water-title"></h3>
+      <label for="by">Nom</label>
+      <input id="by" name="by" list="names" required maxlength="40" autocomplete="off" autocapitalize="words">
+      <datalist id="names"></datalist>
+      <label for="day">Jour</label>
+      <input id="day" name="day" type="date" required>
+      <p id="water-error" class="error" role="alert"></p>
+      <div class="actions">
+        <button type="button" id="water-cancel">Annuler</button>
+        <button type="submit" id="water-ok" class="primary">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <section id="gate" hidden>
+    <form id="gate-form">
+      <h2>Eden</h2>
+      <label for="code">Code du jardin</label>
+      <input id="code" required autocomplete="off" autocapitalize="none" spellcheck="false">
+      <p class="muted">Demandez-le à la famille. Vous ne le taperez qu'une fois sur ce téléphone.</p>
+      <p id="gate-error" class="error" role="alert"></p>
+      <button type="submit" class="primary">Entrer</button>
+    </form>
+  </section>
+
+  <p id="toast" role="status" hidden></p>
   <script type="module" src="./src/main.js"></script>
 </body>
 </html>

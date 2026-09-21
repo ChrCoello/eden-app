@@ -88,8 +88,9 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
 - [x] 2.4 First launch: "Code du jardin" screen, checked against Firestore, remembered on the phone.
 - [x] 2.5 Zone sheet shows the latest watering; 💧 → Nom / Jour form → OK / Annuler; live sync.
       Tested end-to-end in a phone viewport against an in-memory backend (`vite --mode fake`).
-- [ ] 2.5b (User + me) Deploy the rules (`npm run deploy:rules`, needs `firebase login`) and create
-      the garden document in the console. Then test with the real Firestore.
+- [x] 2.5b Rules pasted in the console + garden document created (user). CI runs the 15 rules tests
+      in the emulator. Live check against real Firestore (read-only): wrong code refused, right code
+      accepted, waterings readable. (Later: `npm run deploy:rules` after `firebase login`.)
 - [ ] 2.6 Coloring by days since last watered (today / 1–2 d / 3–6 d / 7+ d / never) + legend.
 - [ ] 2.7 Zone sheet: recent history (latest watering already shown).
 - [ ] 2.8 Rules tests written (`app/rules/`, run in CI with Java 21: can't run locally, Java 11 here);

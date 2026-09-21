@@ -1,0 +1,9 @@
+{
+ "image": "map.jpg",
+ "px_per_m": [
+  23.5203,
+  23.4013
+ ],
+ "note": "local meters: x = px_x / px_per_m[0], y = -px_y / px_per_m[1] (y up, north up)",
+ "rms_cm": 7.9
+}

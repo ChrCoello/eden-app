@@ -216,3 +216,9 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+*:Zone.Identifier
+.DS_Store
+node_modules/
+
+# derived from the PDF by tools/extract_scan.py
+data/map.jpg

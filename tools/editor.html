@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Garden zone editor</title>
+<style>
+  :root { --panel: #f6f5f1; --ink: #222; --muted: #777; --accent: #e8a200; }
+  * { box-sizing: border-box; }
+  body { margin: 0; display: flex; height: 100vh; font: 14px system-ui, sans-serif; color: var(--ink); background: #ddd; }
+  #map { flex: 1; cursor: grab; user-select: none; }
+  #map.panning { cursor: grabbing; }
+  aside { width: 300px; padding: 12px; background: var(--panel); overflow-y: auto; border-left: 1px solid #ccc; }
+  h1 { font-size: 16px; margin: 0 0 8px; }
+  h2 { font-size: 13px; margin: 16px 0 6px; text-transform: uppercase; color: var(--muted); }
+  label { display: block; margin: 6px 0 2px; color: var(--muted); font-size: 12px; }
+  input, select, button { font: inherit; width: 100%; padding: 4px 6px; }
+  button { cursor: pointer; margin-top: 6px; }
+  #save.dirty { background: var(--accent); font-weight: 600; }
+  #status { margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 1em; }
+  #list { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
+  #list button { margin: 0; padding: 3px 0; font-size: 12px; }
+  #list button.sel { outline: 2px solid var(--accent); }
+  .help { font-size: 12px; color: var(--muted); line-height: 1.5; }
+  .help b { color: var(--ink); }
+  .cell { vector-effect: non-scaling-stroke; stroke: #c00; stroke-width: 1.2; cursor: pointer; }
+  .cell.path { fill: rgba(40, 90, 255, .12); stroke: #2a5cff; }
+  .cell.lawn { fill: rgba(120, 200, 80, .10); stroke: #4a8a2a; }
+  .cell.sel { stroke: var(--accent); stroke-width: 3; }
+  .label { font-weight: 700; fill: #000; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+  .handle { fill: #fff; stroke: #000; vector-effect: non-scaling-stroke; stroke-width: 1; cursor: move; }
+  .handle.shared { fill: var(--accent); }
+</style>
+</head>
+<body>
+<svg id="map"><g id="view"><image id="scan" href="../data/map.jpg"/><g id="cells"></g><g id="labels"></g><g id="handles"></g></g></svg>
+<aside>
+  <h1>Garden zone editor</h1>
+  <button id="save">Save</button>
+  <div id="status"></div>
+
+  <h2>Selected</h2>
+  <div id="selected">
+    <label>ID</label><input id="f-id">
+    <label>Kind</label>
+    <select id="f-kind"><option>zone</option><option>lawn</option><option>path</option></select>
+    <label>Name</label><input id="f-name" placeholder="e.g. Section Acer">
+    <label>Area</label><div id="f-area"></div>
+  </div>
+
+  <h2>View</h2>
+  <label>Scan opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.8">
+  <label><input id="show-labels" type="checkbox" checked style="width:auto"> labels</label>
+
+  <h2>Features</h2>
+  <div id="list"></div>
+
+  <h2>How to</h2>
+  <div class="help">
+    <b>Pan</b> drag · <b>Zoom</b> wheel<br>
+    <b>Select</b> click a zone<br>
+    <b>Move a corner</b> drag a handle (orange = shared, moves both zones)<br>
+    <b>Add a corner</b> double-click an edge of the selected zone<br>
+    <b>Delete a corner</b> shift-click a handle<br>
+    <b>Undo</b> Ctrl+Z<br>
+    Big mistakes: move the seed in <code>data/zone_seeds.json</code> and re-run
+    <code>uv run tools/segment_zones.py</code> instead.
+  </div>
+</aside>
+<script>
+const $ = (id) => document.getElementById(id);
+const svg = $("map"), view = $("view");
+const NS = "http://www.w3.org/2000/svg";
+let fc, px_per_m, selected = null, dirty = false, undo = [];
+let k = 1, tx = 0, ty = 0;                        // screen px per meter, pan offset
+let scanW, scanH;                                 // scan size in meters
+
+// ---- geometry helpers: GeoJSON meters (y up) -> SVG (y down) --------------------------
+const polys = (g) => (g.type === "Polygon" ? [g.coordinates] : g.coordinates);
+const rings = (f) => polys(f.geometry).flat();
+const key = ([x, y]) => `${x.toFixed(2)},${y.toFixed(2)}`;
+const r2 = (v) => Math.round(v * 100) / 100;
+
+function pathD(f) {
+  return rings(f).map((r) => "M" + r.map(([x, y]) => `${x},${-y}`).join("L") + "Z").join("");
+}
+function ringArea(r) {
+  let a = 0;
+  for (let i = 0; i < r.length - 1; i++) a += r[i][0] * r[i + 1][1] - r[i + 1][0] * r[i][1];
+  return a / 2;
+}
+function area(f) {
+  return polys(f.geometry).reduce((s, p) => s + Math.abs(ringArea(p[0])) - p.slice(1).reduce((h, r) => h + Math.abs(ringArea(r)), 0), 0);
+}
+function labelPoint(f) {
+  const outer = polys(f.geometry).map((p) => p[0]).sort((a, b) => Math.abs(ringArea(b)) - Math.abs(ringArea(a)))[0];
+  let cx = 0, cy = 0, a = 0;
+  for (let i = 0; i < outer.length - 1; i++) {
+    const [x0, y0] = outer[i], [x1, y1] = outer[i + 1], c = x0 * y1 - x1 * y0;
+    a += c; cx += (x0 + x1) * c; cy += (y0 + y1) * c;
+  }
+  return [cx / (3 * a), cy / (3 * a)];
+}
+/** Every occurrence of a vertex across all features: shared corners move together. */
+function refsOf(k0) {
+  const out = [];
+  for (const f of fc.features) for (const r of rings(f)) r.forEach((p, i) => { if (key(p) === k0) out.push([r, i]); });
+  return out;
+}
+
+// ---- rendering -------------------------------------------------------------------------
+function render() {
+  const cells = $("cells"), labels = $("labels");
+  cells.replaceChildren(); labels.replaceChildren();
+  for (const f of fc.features) {
+    const p = document.createElementNS(NS, "path");
+    p.setAttribute("d", pathD(f));
+    p.setAttribute("fill-rule", "evenodd");
+    p.setAttribute("class", `cell ${f.properties.kind}` + (f === selected ? " sel" : ""));
+    if (f.properties.kind === "zone") p.setAttribute("fill", `hsla(${hash(f.properties.id) % 360},70%,55%,.22)`);
+    p.__f = f;
+    p.addEventListener("click", () => { if (!moved) select(f); });
+    cells.append(p);
+    if (f.properties.kind !== "path") {
+      const [x, y] = labelPoint(f), t = document.createElementNS(NS, "text");
+      t.setAttribute("x", x); t.setAttribute("y", -y); t.setAttribute("class", "label");
+      t.textContent = f.properties.id;
+      labels.append(t);
+    }
+  }
+  if (selected) cells.append(cells.querySelector(".sel"));     // selected on top
+  renderHandles(); renderList(); renderPanel(); applyView();
+}
+function renderHandles() {
+  const g = $("handles");
+  g.replaceChildren();
+  if (!selected) return;
+  const seen = new Set();
+  for (const r of rings(selected)) for (const p of r) {
+    const kk = key(p);
+    if (seen.has(kk)) continue;
+    seen.add(kk);
+    const c = document.createElementNS(NS, "circle");
+    c.setAttribute("cx", p[0]); c.setAttribute("cy", -p[1]); c.setAttribute("r", 5 / k);
+    const shared = new Set(refsOf(kk).map(([r]) => r)).size > 1;
+    c.setAttribute("class", "handle" + (shared ? " shared" : ""));
+    c.dataset.key = kk;
+    g.append(c);
+  }
+}
+function renderList() {
+  $("list").replaceChildren(...fc.features.map((f) => {
+    const b = document.createElement("button");
+    b.textContent = f.properties.id;
+    if (f === selected) b.className = "sel";
+    b.onclick = () => { select(f); centerOn(f); };
+    return b;
+  }));
+}
+function renderPanel() {
+  const p = selected?.properties;
+  for (const [id, field] of [["f-id", "id"], ["f-kind", "kind"], ["f-name", "name"]]) {
+    $(id).value = p ? p[field] ?? "" : ""; $(id).disabled = !p;
+  }
+  $("f-area").textContent = selected ? `${Math.round(area(selected))} m²` : "–";
+  $("save").className = dirty ? "dirty" : "";
+}
+function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) * 47; }
+
+// ---- view ------------------------------------------------------------------------------
+function applyView() {
+  view.setAttribute("transform", `translate(${tx},${ty}) scale(${k})`);
+  $("labels").style.fontSize = `${14 / k}px`;
+  $("labels").style.display = $("show-labels").checked ? "" : "none";
+  for (const c of $("handles").children) c.setAttribute("r", 5 / k);
+}
+function toWorld(e) {
+  const b = svg.getBoundingClientRect();
+  return [(e.clientX - b.left - tx) / k, -((e.clientY - b.top - ty) / k)];
+}
+function fit() {
+  const b = svg.getBoundingClientRect(), [w, h] = [scanW, scanH];
+  k = Math.min(b.width / w, b.height / h); tx = (b.width - w * k) / 2; ty = (b.height - h * k) / 2;
+}
+function centerOn(f) {
+  const b = svg.getBoundingClientRect(), [x, y] = labelPoint(f);
+  tx = b.width / 2 - x * k; ty = b.height / 2 + y * k; applyView();
+}
+svg.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const b = svg.getBoundingClientRect(), mx = e.clientX - b.left, my = e.clientY - b.top;
+  const f = Math.exp(-e.deltaY * 0.0015);
+  tx = mx - (mx - tx) * f; ty = my - (my - ty) * f; k *= f;
+  applyView();
+}, { passive: false });
+
+// ---- interaction -----------------------------------------------------------------------
+let drag = null, moved = false;
+svg.addEventListener("mousedown", (e) => {
+  moved = false;
+  const h = e.target.closest(".handle");
+  if (h && e.shiftKey) return deleteVertex(h.dataset.key);
+  if (h) { snapshot(); drag = { refs: refsOf(h.dataset.key), el: h }; return; }
+  drag = { pan: true, x: e.clientX - tx, y: e.clientY - ty };
+  svg.classList.add("panning");
+});
+window.addEventListener("mousemove", (e) => {
+  if (!drag) return;
+  moved = true;
+  if (drag.pan) { tx = e.clientX - drag.x; ty = e.clientY - drag.y; return applyView(); }
+  const [x, y] = toWorld(e).map(r2);
+  for (const [r, i] of drag.refs) r[i] = [x, y];
+  drag.el.setAttribute("cx", x); drag.el.setAttribute("cy", -y);
+  redrawCells();
+});
+window.addEventListener("mouseup", () => {
+  if (drag && !drag.pan) { markDirty(); render(); }
+  drag = null; svg.classList.remove("panning");
+});
+svg.addEventListener("dblclick", (e) => {
+  if (!selected) return;
+  const p = toWorld(e);
+  let best = null;
+  for (const r of rings(selected)) for (let i = 0; i < r.length - 1; i++) {
+    const d = segDist(p, r[i], r[i + 1]);
+    if (!best || d < best.d) best = { d, a: key(r[i]), b: key(r[i + 1]) };
+  }
+  if (!best || best.d * k > 12) return;
+  snapshot();
+  const np = p.map(r2);
+  for (const f of fc.features) for (const r of rings(f)) for (let i = 0; i < r.length - 1; i++) {
+    const [ka, kb] = [key(r[i]), key(r[i + 1])];
+    if ((ka === best.a && kb === best.b) || (ka === best.b && kb === best.a)) { r.splice(i + 1, 0, np); i++; }
+  }
+  markDirty(); render();
+});
+function deleteVertex(kk) {
+  const refs = refsOf(kk);
+  if (refs.some(([r]) => r.length <= 4)) return status("A shape needs at least 3 corners.");
+  snapshot();
+  const byRing = new Map();
+  for (const [r, i] of refs) byRing.set(r, [...(byRing.get(r) || []), i]);
+  for (const [r, idx] of byRing) {
+    for (const i of idx.sort((a, b) => b - a)) r.splice(i, 1);
+    if (key(r[0]) !== key(r[r.length - 1])) r.push([...r[0]]);   // removed the closing vertex: re-close
+  }
+  markDirty(); render();
+}
+function segDist([px, py], [ax, ay], [bx, by]) {
+  const dx = bx - ax, dy = by - ay, t = Math.max(0, Math.min(1, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy || 1)));
+  return Math.hypot(px - ax - t * dx, py - ay - t * dy);
+}
+function redrawCells() {
+  for (const el of $("cells").children) el.setAttribute("d", pathD(el.__f));
+}
+function select(f) { selected = f; render(); }
+
+// panel edits
+$("f-id").addEventListener("change", (e) => {
+  const v = e.target.value.trim();
+  if (!v || fc.features.some((f) => f !== selected && f.properties.id === v)) { status(`ID "${v}" is empty or taken.`); return renderPanel(); }
+  snapshot(); selected.properties.id = v; markDirty(); render();
+});
+$("f-kind").addEventListener("change", (e) => { snapshot(); selected.properties.kind = e.target.value; markDirty(); render(); });
+$("f-name").addEventListener("change", (e) => { snapshot(); selected.properties.name = e.target.value.trim(); markDirty(); render(); });
+$("opacity").addEventListener("input", (e) => ($("scan").style.opacity = e.target.value));
+$("show-labels").addEventListener("change", applyView);
+
+// ---- undo / save -----------------------------------------------------------------------
+function snapshot() {
+  undo.push({ json: JSON.stringify(fc), sel: selected && fc.features.indexOf(selected) });
+  if (undo.length > 100) undo.shift();
+}
+window.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key === "z" && undo.length && document.activeElement.tagName !== "INPUT") {
+    e.preventDefault();
+    const s = undo.pop();
+    fc = JSON.parse(s.json); selected = s.sel == null ? null : fc.features[s.sel];
+    markDirty(); render();
+  }
+  if (e.key === "Escape") select(null);
+});
+function markDirty() { dirty = true; $("save").className = "dirty"; }
+function status(msg) { $("status").textContent = msg; }
+$("save").onclick = async () => {
+  const res = await fetch("../data/garden.json", { method: "PUT", body: JSON.stringify(fc) });
+  if (!res.ok) return status(`Save failed: ${res.status} (is tools/serve.py running?)`);
+  dirty = false; renderPanel(); status(`Saved ${new Date().toLocaleTimeString()}`);
+};
+window.addEventListener("beforeunload", (e) => { if (dirty) e.preventDefault(); });
+
+// ---- boot ------------------------------------------------------------------------------
+(async () => {
+  [fc, { px_per_m }] = await Promise.all(["garden.json", "calibration.json"].map((f) => fetch(`../data/${f}`).then((r) => r.json())));
+  const img = new Image();
+  img.src = "../data/map.jpg";
+  await img.decode();
+  [scanW, scanH] = [img.naturalWidth / px_per_m[0], img.naturalHeight / px_per_m[1]];
+  const scan = $("scan");
+  scan.setAttribute("width", scanW); scan.setAttribute("height", scanH);
+  scan.style.opacity = $("opacity").value;
+  fit(); render();
+})();
+</script>
+</body>
+</html>

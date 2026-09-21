@@ -1,0 +1,103 @@
+:root {
+  --bg: #eef2ea;
+  --surface: #ffffff;
+  --ink: #1d2a1f;
+  --muted: #5f6f62;
+  --brand: #2f6b3a;
+  --zone: #a9d18e;
+  --zone-edge: #f5f8f2;
+  --lawn: #d6e9c6;
+  --path: #c8a27a;
+  --selected: #e08a00;
+  --shadow: 0 -4px 24px rgb(0 0 0 / 0.15);
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #121a14;
+    --surface: #1d2720;
+    --ink: #e6efe6;
+    --muted: #9aab9d;
+    --brand: #6fbf7e;
+    --zone: #3f6b44;
+    --zone-edge: #121a14;
+    --lawn: #2a3d2d;
+    --path: #7a5f45;
+    --shadow: 0 -4px 24px rgb(0 0 0 / 0.5);
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--ink);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  overscroll-behavior: none;
+}
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
+  background: var(--brand);
+  color: #fff;
+}
+header h1 { flex: 1; margin: 0; font-size: 20px; }
+header button {
+  border: 1px solid rgb(255 255 255 / 0.5);
+  border-radius: 999px;
+  padding: 6px 14px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 14px;
+}
+header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
+
+#map { flex: 1; width: 100%; touch-action: none; user-select: none; -webkit-user-select: none; }
+
+.scan { opacity: 0; transition: opacity 0.2s; pointer-events: none; }
+.scan.visible { opacity: 0.55; }
+.shape { vector-effect: non-scaling-stroke; }
+.shape.zone { fill: var(--zone); stroke: var(--zone-edge); stroke-width: 1.5; }
+.shape.lawn { fill: var(--lawn); stroke: var(--zone-edge); stroke-width: 1.5; }
+.shape.path { fill: var(--path); pointer-events: none; }
+.scan.visible ~ g .shape.zone, .scan.visible ~ g .shape.lawn { fill-opacity: 0.45; }
+.shape.selected { stroke: var(--selected); stroke-width: 4; }
+.label {
+  fill: var(--ink);
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
+  paint-order: stroke;
+  stroke: var(--bg);        /* stroke-width is set per zoom level in map.js */
+  stroke-linejoin: round;
+  pointer-events: none;
+}
+
+#sheet {
+  position: fixed;
+  inset: auto 0 0;
+  padding: 16px 16px calc(env(safe-area-inset-bottom) + 16px);
+  background: var(--surface);
+  border-radius: 16px 16px 0 0;
+  box-shadow: var(--shadow);
+}
+#sheet h2 { margin: 0; font-size: 28px; }
+#sheet p { margin: 4px 0 0; }
+.muted { color: var(--muted); font-size: 14px; }
+#close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 28px;
+}

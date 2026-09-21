@@ -12,9 +12,15 @@ Cells are vectorized along pixel edges (neighbours share identical borders), sim
 with shared arcs preserved, converted to meters with data/calibration.json, and written to
 data/garden.json.
 
-Run: uv run tools/segment_zones.py
+Run: uv run tools/segment_zones.py [--force]
+
+garden.json is hand-edited afterwards (tools/editor.html). The file records a fingerprint of what
+this script generated; if the features no longer match it, the script refuses to overwrite your
+edits unless --force is given.
 """
+import hashlib
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -74,21 +80,28 @@ def segment(walls, elevation, seeds):
 
 
 def drop_islands(labels, path_label):
-    """Zones keep only their main connected piece, paths only pieces over ~20 m2.
+    """Zones keep only their main connected piece. Paths keep pieces over ~20 m2 that touch the
+    garden (the red logo in the title block is path-coloured too).
     The freed pixels go back to 0 and are re-assigned by fill_gaps, so no holes appear."""
     out = labels.copy()
+    near_garden = ndi.binary_dilation((labels > 0) & (labels != path_label), iterations=2)
     for value in np.setdiff1d(np.unique(labels), [0]):
         pieces, _ = ndi.label(labels == value)
         sizes = np.bincount(pieces.ravel())
         sizes[0] = 0
-        keep = sizes >= PATH_MIN_PX if value == path_label else sizes == sizes.max()
+        if value == path_label:
+            keep = (sizes >= PATH_MIN_PX) & np.isin(np.arange(len(sizes)), pieces[near_garden])
+        else:
+            keep = sizes == sizes.max()
         out[(pieces > 0) & ~keep[pieces]] = 0
     return out
 
 
 def fill_gaps(labels):
-    """Give every unlabeled pixel inside the garden (ink lines, printed text) to its nearest cell."""
-    inside = ndi.binary_fill_holes(labels > 0)
+    """Give every unlabeled pixel inside the garden (ink lines, printed text, stake markers) to its
+    nearest cell. The closing makes thin unlabeled strips (path outlines running out to the property
+    edge) count as inside; otherwise they'd stay as gaps open to the outside."""
+    inside = ndi.binary_fill_holes(ndi.binary_closing(labels > 0, iterations=5))
     _, (iy, ix) = ndi.distance_transform_edt(labels == 0, return_indices=True)
     return np.where(inside & (labels == 0), labels[iy, ix], labels)
 
@@ -98,7 +111,21 @@ def to_meters(geom, px_per_m):
     return shapely.transform(geom, lambda c: np.column_stack([c[:, 0] * K / sx, -c[:, 1] * K / sy]))
 
 
+def fingerprint(features):
+    return hashlib.sha256(json.dumps(features, sort_keys=True).encode()).hexdigest()[:16]
+
+
+def check_not_hand_edited(path):
+    if not path.exists() or "--force" in sys.argv:
+        return
+    current = json.loads(path.read_text())
+    if current.get("generated") != fingerprint(current["features"]):
+        sys.exit(f"{path} has been edited since it was generated. Re-run with --force to discard those edits.")
+
+
 def main():
+    out = DATA / "garden.json"
+    check_not_hand_edited(out)
     seeds_doc = json.loads((DATA / "zone_seeds.json").read_text())
     kinds = {**{n: "zone" for n in seeds_doc["zones"]}, **{n: "lawn" for n in seeds_doc["lawns"]}}
     seeds = {**seeds_doc["zones"], **seeds_doc["lawns"]}
@@ -125,7 +152,8 @@ def main():
         f["geometry"] = mapping(shapely.set_precision(shape(f["geometry"]), 0.01))
         f["properties"].setdefault("name", "")
     fc["features"].sort(key=lambda f: (f["properties"]["kind"] != "zone", f["properties"]["id"]))
-    (DATA / "garden.json").write_text(json.dumps(fc, separators=(",", ":")))
+    fc["generated"] = fingerprint(fc["features"])
+    out.write_text(json.dumps(fc, separators=(",", ":")))
 
     for f in fc["features"]:
         print(f'{f["properties"]["id"]:>11} {f["properties"]["kind"]:>5} {shape(f["geometry"]).area:8.0f} m2')

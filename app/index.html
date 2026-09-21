@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Eden – arrosage</title>
+  <meta name="theme-color" content="#2f6b3a">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Eden">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icon-192.png">
+  <link rel="apple-touch-icon" href="./apple-touch-icon.png">
+</head>
+<body>
+  <header>
+    <h1>Eden</h1>
+    <button id="scan-toggle" aria-pressed="false" title="Afficher le plan scanné">Plan</button>
+    <button id="fit" title="Voir tout le jardin">Tout voir</button>
+  </header>
+  <svg id="map" role="img" aria-label="Plan du jardin"></svg>
+  <section id="sheet" hidden>
+    <button id="close" aria-label="Fermer">×</button>
+    <h2 id="zone-id"></h2>
+    <p id="zone-name"></p>
+    <p id="zone-area" class="muted"></p>
+  </section>
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>

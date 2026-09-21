@@ -14,6 +14,7 @@ and writes data/calibration.json.
 import json
 from pathlib import Path
 import numpy as np
+from PIL import Image
 from scipy.optimize import least_squares
 
 DATA = Path(__file__).resolve().parent.parent / "data"
@@ -48,6 +49,7 @@ print(f"RMS {np.sqrt((res ** 2).mean()) * 100:.1f} cm, max {np.abs(res).max() * 
 
 (DATA / "calibration.json").write_text(json.dumps({
     "image": "map.jpg",
+    "image_size": list(Image.open(DATA / "map.jpg").size),
     "px_per_m": [round(sx, 4), round(sy, 4)],
     "note": "local meters: x = px_x / px_per_m[0], y = -px_y / px_per_m[1] (y up, north up)",
     "rms_cm": round(float(np.sqrt((res ** 2).mean()) * 100), 1),

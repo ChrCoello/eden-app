@@ -33,6 +33,8 @@ for (ka, a), (kb, b) in itertools.combinations(valid.items(), 2):
     if (area := a.intersection(b).area) > 0.05:
         problems.append(f"overlap {ka}/{kb}: {area:.2f} m2")
 union = shapely.union_all(list(valid.values()))
+if (n := len(shapely.get_parts(union))) > 1:
+    problems.append(f"garden is split into {n} pieces (gaps between cells)")
 holes = [shapely.Polygon(r) for p in shapely.get_parts(union) for r in p.interiors]
 problems += [f"hole of {h.area:.2f} m2 near ({h.centroid.x:.0f}, {h.centroid.y:.0f})" for h in holes if h.area > 0.05]
 

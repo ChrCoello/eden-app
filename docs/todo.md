@@ -78,7 +78,7 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", at: serverTi
       Still to confirm: Firestore created + Anonymous auth enabled; garden code; list of names.
 - [x] 2.2 `app/`: Vite 6 + Vitest 3 (they support local Node 20.11; CI uses Node 22), PWA manifest +
       icons (`tools/make_icons.py`), `.github/workflows/deploy.yml` (test → build → Pages).
-      Still to do: enable Pages with source "GitHub Actions" in the repo settings.
+      Live at https://chrcoello.github.io/eden-app/ (Pages source: GitHub Actions; deploys on push to main).
 - [x] 2.3 Map screen (French UI): SVG from `garden.json`, pan, pinch-zoom, wheel zoom, tap → zone sheet
       (id, name, area), "Plan" toggles the scan underneath, "Tout voir" re-fits, dark mode.
       Checked in headless Chrome on a 390×844 touch viewport: taps hit the right zone, pan ≠ tap, pinch zooms.

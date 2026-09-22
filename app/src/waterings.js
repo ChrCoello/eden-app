@@ -48,12 +48,15 @@ export function describeDay(day, today = isoDay()) {
   return `le ${d} ${MONTHS[m - 1]}${y === Number(today.slice(0, 4)) ? "" : ` ${y}`}`;
 }
 
-/** Dryness level shown on the map: 0 = watered today, 1 = 1–2 days ago, 2 = 3–6 days,
- *  3 = a week or more, null = no watering on record. */
+/** Dryness level shown on the map (user's scale, 2026-09-22): 0 = watered 0–4 days ago (green),
+ *  then one level per day: 1 = 5 days, 2 = 6, 3 = 7, 4 = 8, 5 = 9 days or more (red).
+ *  null = no watering on record. */
+const GREEN_DAYS = 4;
+const MAX_LEVEL = 5;
 export function dryness(lastDay, today = isoDay()) {
   if (!lastDay) return null;
   const n = daysBetween(lastDay, today);
-  return n <= 0 ? 0 : n <= 2 ? 1 : n <= 6 ? 2 : 3;
+  return Math.min(Math.max(n - GREEN_DAYS, 0), MAX_LEVEL);
 }
 
 /** A zone's waterings, most recent first. */

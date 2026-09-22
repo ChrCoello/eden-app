@@ -1,6 +1,10 @@
-// In-memory stand-in for firebase.js, same API. Used by `vite --mode fake` for UI tests
-// without touching the real Firestore. Valid code: "test-garden".
-const waterings = [];
+// In-memory stand-in for firebase.js, same API. Used by `npm run dev:fake` (and UI tests) to try
+// the app without touching the real Firestore. Valid code: "test-garden". Reloading resets it.
+import { addDays, isoDay } from "./waterings.js";
+
+// Sample waterings so every colour shows at once: [zone, days ago].
+const waterings = [["E1", 1], ["E2", 4], ["E3", 5], ["E4", 6], ["F2", 7], ["F4", 8], ["G3", 12], ["F1", 2]]
+  .map(([zone, n]) => ({ zone, by: "Démo", day: addDays(isoDay(), -n), at: new Date() }));
 const listeners = new Set();
 const delay = () => new Promise((r) => setTimeout(r, 50));
 

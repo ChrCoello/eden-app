@@ -10,11 +10,15 @@
   --lawn: #d6e9c6;
   --path: #faf8f2;   /* gravel: recessive, not data */
   --selected: var(--ink);   /* visible on every fill: orange, grey and the automatic blue */
-  /* dryness: one orange hue, light → dark = watered today → a week or more (validated, ordinal) */
-  --dry-0: #e6934f;
-  --dry-1: #cc6c2c;
-  --dry-2: #a24c18;
-  --dry-3: #6b2f0c;
+  /* days since watering, user's scale: green (0–4 j) → light green → yellow → light orange →
+     dark orange → red (9 j +). Adjacent steps can't all be told apart with red–green colour
+     blindness (validator: light green ↔ yellow); the zone sheet always gives the exact day. */
+  --dry-0: #2f9140;
+  --dry-1: #9ad64a;
+  --dry-2: #f7c21a;
+  --dry-3: #f39036;
+  --dry-4: #d4461c;
+  --dry-5: #9c1b17;
   --never: #c9ccc4;
   --auto: #5598e7;       /* automatic watering; validated against --never and every --dry step */
   --water: #2f7fd1;
@@ -35,11 +39,12 @@
     --zone-edge: #121a14;
     --lawn: #2a3d2d;
     --path: #2c332e;
-    /* dark surface: the anchor flips, drier = brighter */
-    --dry-0: #8a4518;
-    --dry-1: #b25c22;
-    --dry-2: #d8793a;
-    --dry-3: #f2a869;
+    --dry-0: #3a8a42;
+    --dry-1: #86c24a;
+    --dry-2: #e0b81f;
+    --dry-3: #e6862e;
+    --dry-4: #cc4c1c;
+    --dry-5: #a82a24;
     --never: #465048;
     --auto: #3987e5;
     --water: #4b9be6;
@@ -106,6 +111,8 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
 .shape[data-dry="1"], #legend [data-dry="1"] { fill: var(--dry-1); background: var(--dry-1); }
 .shape[data-dry="2"], #legend [data-dry="2"] { fill: var(--dry-2); background: var(--dry-2); }
 .shape[data-dry="3"], #legend [data-dry="3"] { fill: var(--dry-3); background: var(--dry-3); }
+.shape[data-dry="4"], #legend [data-dry="4"] { fill: var(--dry-4); background: var(--dry-4); }
+.shape[data-dry="5"], #legend [data-dry="5"] { fill: var(--dry-5); background: var(--dry-5); }
 .shape[data-dry="never"], #legend [data-dry="never"] { fill: var(--never); background: var(--never); }
 .shape[data-dry="auto"], #legend [data-dry="auto"] { fill: var(--auto); background: var(--auto); }
 .shape.selected { stroke: var(--selected); stroke-width: 4; }

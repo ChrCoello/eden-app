@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host",
+    "dev:fake": "vite --host --mode fake",
     "build": "vite build",
     "preview": "vite preview --host",
     "test": "vitest run",

@@ -91,11 +91,13 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
 - [x] 2.5b Rules pasted in the console + garden document created (user). CI runs the 15 rules tests
       in the emulator. Live check against real Firestore (read-only): wrong code refused, right code
       accepted, waterings readable. (Later: `npm run deploy:rules` after `firebase login`.)
-- [x] 2.6 Zones coloured by days since last watered: one orange hue, light → dark = aujourd'hui /
-      1–2 j / 3–6 j / 7 j et + (drier = darker: what needs water stands out), grey = jamais,
-      blue = automatique. Ramps validated with the dataviz validator (ordinal, light and dark surfaces;
-      dark mode flips the anchor). Legend in the header. Paths turned to a recessive gravel colour.
-      Colours are recomputed when the app returns to the foreground (the day may have changed).
+- [x] 2.6 Zones coloured by days since last watered, user's scale (2026-09-22): green for 0–4 days,
+      then one step per day: 5 light green, 6 yellow, 7 light orange, 8 dark orange, 9+ red; grey =
+      jamais, blue = automatique. Legend in the header. Paths in a recessive gravel colour. Colours are
+      recomputed when the app returns to the foreground (the day may have changed).
+      Known limit (validator): light green ↔ yellow are hard to tell apart with red–green colour
+      blindness, and yellow↔light orange / dark orange↔red sit below the normal-vision floor (ΔE 12.6
+      / 10.4 < 15). The zone sheet always shows the exact day. First version was a single orange ramp.
 - [x] 2.7 Zone sheet: latest watering + up to 4 previous ones.
 - [x] 2.7b Zone attributes (user request, 2026-09-22) in `garden.json`, edited in `tools/editor.html`:
       `auto` (on automatic watering: blue on the map, "Arrosage automatique", no 💧 button) and

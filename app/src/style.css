@@ -4,11 +4,19 @@
   --ink: #1d2a1f;
   --muted: #5f6f62;
   --brand: #2f6b3a;
+  --header: #2f6b3a;
   --zone: #a9d18e;
   --zone-edge: #f5f8f2;
   --lawn: #d6e9c6;
-  --path: #c8a27a;
-  --selected: #e08a00;
+  --path: #faf8f2;   /* gravel: recessive, not data */
+  --selected: var(--ink);   /* visible on every fill: orange, grey and the automatic blue */
+  /* dryness: one orange hue, light → dark = watered today → a week or more (validated, ordinal) */
+  --dry-0: #e6934f;
+  --dry-1: #cc6c2c;
+  --dry-2: #a24c18;
+  --dry-3: #6b2f0c;
+  --never: #c9ccc4;
+  --auto: #5598e7;       /* automatic watering; validated against --never and every --dry step */
   --water: #2f7fd1;
   --line: #c9d3c6;
   --error: #b3261e;
@@ -22,10 +30,18 @@
     --ink: #e6efe6;
     --muted: #9aab9d;
     --brand: #6fbf7e;
+    --header: #1f4527;   /* white header text needs a dark green, not the bright brand accent */
     --zone: #3f6b44;
     --zone-edge: #121a14;
     --lawn: #2a3d2d;
-    --path: #7a5f45;
+    --path: #2c332e;
+    /* dark surface: the anchor flips, drier = brighter */
+    --dry-0: #8a4518;
+    --dry-1: #b25c22;
+    --dry-2: #d8793a;
+    --dry-3: #f2a869;
+    --never: #465048;
+    --auto: #3987e5;
     --water: #4b9be6;
     --line: #3a4a3d;
     --error: #ff8a80;
@@ -49,10 +65,23 @@ header {
   align-items: center;
   gap: 8px;
   padding: calc(env(safe-area-inset-top) + 8px) 16px 8px;
-  background: var(--brand);
+  background: var(--header);
   color: #fff;
 }
+header { flex-wrap: wrap; }
 header h1 { flex: 1; margin: 0; font-size: 20px; }
+#legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  width: 100%;
+  margin: 2px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+}
+#legend li { display: flex; align-items: center; gap: 5px; }
+#legend i { width: 14px; height: 14px; border-radius: 4px; box-shadow: 0 0 0 1px rgb(255 255 255 / 0.6); }
 header button {
   border: 1px solid rgb(255 255 255 / 0.5);
   border-radius: 999px;
@@ -73,6 +102,12 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
 .shape.lawn { fill: var(--lawn); stroke: var(--zone-edge); stroke-width: 1.5; }
 .shape.path { fill: var(--path); pointer-events: none; }
 .scan.visible ~ g .shape.zone, .scan.visible ~ g .shape.lawn { fill-opacity: 0.45; }
+.shape[data-dry="0"], #legend [data-dry="0"] { fill: var(--dry-0); background: var(--dry-0); }
+.shape[data-dry="1"], #legend [data-dry="1"] { fill: var(--dry-1); background: var(--dry-1); }
+.shape[data-dry="2"], #legend [data-dry="2"] { fill: var(--dry-2); background: var(--dry-2); }
+.shape[data-dry="3"], #legend [data-dry="3"] { fill: var(--dry-3); background: var(--dry-3); }
+.shape[data-dry="never"], #legend [data-dry="never"] { fill: var(--never); background: var(--never); }
+.shape[data-dry="auto"], #legend [data-dry="auto"] { fill: var(--auto); background: var(--auto); }
 .shape.selected { stroke: var(--selected); stroke-width: 4; }
 .label {
   fill: var(--ink);
@@ -111,6 +146,8 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
 /* ---- zone sheet: latest watering + drop button ---- */
 #sheet { padding-right: 96px; }   /* keep text clear of the drop button */
 #last-watering { font-weight: 600; }
+#history { margin: 4px 0 0; padding: 0; list-style: none; color: var(--muted); font-size: 14px; }
+#history:empty { display: none; }
 #water {
   position: absolute;
   right: 16px;

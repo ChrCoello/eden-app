@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { addDays, describeDay, isoDay, knownNames, latestByZone } from "./waterings.js";
+import { addDays, describeDay, dryness, isoDay, knownNames, latestByZone, zoneHistory } from "./waterings.js";
 
 describe("days", () => {
   test("isoDay uses the local calendar day, zero-padded", () => {
@@ -53,4 +53,30 @@ describe("latestByZone", () => {
 test("knownNames: most used first, then alphabetical", () => {
   const w = (by) => ({ zone: "A1", by, day: "2026-09-21", at: null });
   expect(knownNames([w("Chris"), w("Papa"), w("Papa"), w("Anna")])).toEqual(["Papa", "Anna", "Chris"]);
+});
+
+test.each([
+  [null, null],
+  ["2026-09-21", 0],
+  ["2026-09-20", 1],
+  ["2026-09-19", 1],
+  ["2026-09-18", 2],
+  ["2026-09-15", 2],
+  ["2026-09-14", 3],
+  ["2025-01-01", 3],
+])("dryness(%s) on 2026-09-21 → %s", (day, level) => {
+  expect(dryness(day, "2026-09-21")).toBe(level);
+});
+
+test("zoneHistory: only that zone, most recent day first, then latest entry", () => {
+  const w = (zone, by, day, h) => ({ zone, by, day, at: h == null ? null : new Date(2026, 8, 21, h) });
+  const history = zoneHistory([
+    w("B3", "a", "2026-09-10", 9),
+    w("A1", "x", "2026-09-21", 9),
+    w("B3", "b", "2026-09-21", 8),
+    w("B3", "c", "2026-09-21", 18),
+    w("B3", "d", "2026-09-21", null),
+    w("B3", "e", "2026-09-21", null),
+  ], "B3");
+  expect(history.map((h) => h.by)).toEqual(["d", "e", "c", "b", "a"]);
 });

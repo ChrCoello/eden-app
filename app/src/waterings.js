@@ -47,3 +47,19 @@ export function describeDay(day, today = isoDay()) {
   const [y, m, d] = day.split("-").map(Number);
   return `le ${d} ${MONTHS[m - 1]}${y === Number(today.slice(0, 4)) ? "" : ` ${y}`}`;
 }
+
+/** Dryness level shown on the map: 0 = watered today, 1 = 1–2 days ago, 2 = 3–6 days,
+ *  3 = a week or more, null = no watering on record. */
+export function dryness(lastDay, today = isoDay()) {
+  if (!lastDay) return null;
+  const n = daysBetween(lastDay, today);
+  return n <= 0 ? 0 : n <= 2 ? 1 : n <= 6 ? 2 : 3;
+}
+
+/** A zone's waterings, most recent first. */
+export function zoneHistory(waterings, zone) {
+  const time = (w) => w.at?.getTime() ?? Infinity;   // pending entries (no server time yet) are newest
+  return waterings
+    .filter((w) => w.zone === zone)
+    .sort((a, b) => b.day.localeCompare(a.day) || (time(a) === time(b) ? 0 : time(a) < time(b) ? 1 : -1));
+}

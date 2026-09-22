@@ -44,6 +44,10 @@
     <label>Kind</label>
     <select id="f-kind"><option>zone</option><option>lawn</option><option>path</option></select>
     <label>Name</label><input id="f-name" placeholder="e.g. Section Acer">
+    <div id="zone-only">
+      <label><input id="f-auto" type="checkbox" style="width:auto"> Automatic watering (no manual logging)</label>
+      <label>Trees</label><input id="f-trees" type="number" min="0" step="1" placeholder="not counted yet">
+    </div>
     <label>Area</label><div id="f-area"></div>
   </div>
 
@@ -162,6 +166,10 @@ function renderPanel() {
     $(id).value = p ? p[field] ?? "" : ""; $(id).disabled = !p;
   }
   $("f-area").textContent = selected ? `${Math.round(area(selected))} m²` : "–";
+  const isZone = p?.kind === "zone";
+  $("zone-only").hidden = !isZone;
+  $("f-auto").checked = isZone && p.auto === true;
+  $("f-trees").value = isZone && p.trees != null ? p.trees : "";
   $("save").className = dirty ? "dirty" : "";
 }
 function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) * 47; }
@@ -260,8 +268,21 @@ $("f-id").addEventListener("change", (e) => {
   if (!v || fc.features.some((f) => f !== selected && f.properties.id === v)) { status(`ID "${v}" is empty or taken.`); return renderPanel(); }
   snapshot(); selected.properties.id = v; markDirty(); render();
 });
-$("f-kind").addEventListener("change", (e) => { snapshot(); selected.properties.kind = e.target.value; markDirty(); render(); });
+$("f-kind").addEventListener("change", (e) => {
+  snapshot();
+  const p = selected.properties;
+  p.kind = e.target.value;
+  if (p.kind === "zone") { p.auto ??= false; p.trees ??= null; }   // zone-only attributes
+  else { delete p.auto; delete p.trees; }
+  markDirty(); render();
+});
 $("f-name").addEventListener("change", (e) => { snapshot(); selected.properties.name = e.target.value.trim(); markDirty(); render(); });
+$("f-auto").addEventListener("change", (e) => { snapshot(); selected.properties.auto = e.target.checked; markDirty(); render(); });
+$("f-trees").addEventListener("change", (e) => {
+  const v = e.target.value.trim();
+  if (v !== "" && !/^\d+$/.test(v)) { status("Trees must be a whole number."); return renderPanel(); }
+  snapshot(); selected.properties.trees = v === "" ? null : Number(v); markDirty(); render();
+});
 $("opacity").addEventListener("input", (e) => ($("scan").style.opacity = e.target.value));
 $("show-labels").addEventListener("change", applyView);
 

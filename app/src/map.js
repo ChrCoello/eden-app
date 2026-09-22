@@ -136,6 +136,10 @@ export function createMap(svg, garden, scan, onSelect) {
 
   return {
     select,
+    /** Colour zones: levelOf(id) → dryness 0..3, null for "never watered", or "auto". */
+    setDryness(levelOf) {
+      for (const [id, shape] of byId) shape.dataset.dry = levelOf(id) ?? "never";
+    },
     fit: () => fit(),
     setScanVisible: (on) => scanImg.classList.toggle("visible", on),
   };

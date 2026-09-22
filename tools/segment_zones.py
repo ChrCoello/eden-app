@@ -151,6 +151,9 @@ def main():
         f.pop("id", None)
         f["geometry"] = mapping(shapely.set_precision(shape(f["geometry"]), 0.01))
         f["properties"].setdefault("name", "")
+        if f["properties"]["kind"] == "zone":
+            f["properties"].setdefault("auto", False)   # on automatic watering: no manual logging
+            f["properties"].setdefault("trees", None)   # number of trees, None = not counted yet
     fc["features"].sort(key=lambda f: (f["properties"]["kind"] != "zone", f["properties"]["id"]))
     fc["generated"] = fingerprint(fc["features"])
     out.write_text(json.dumps(fc, separators=(",", ":")))

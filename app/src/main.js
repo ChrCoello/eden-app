@@ -4,12 +4,13 @@ import scanUrl from "../../data/map_web.webp";
 import { addWatering, gardenExists, watchWaterings } from "./firebase.js";
 import { area } from "./geo.js";
 import { createMap } from "./map.js";
-import { addDays, describeDay, isoDay, knownNames, latestByZone } from "./waterings.js";
+import { addDays, describeDay, dryness, isoDay, knownNames, latestByZone, zoneHistory } from "./waterings.js";
 import "./style.css";
 
 const $ = (id) => document.getElementById(id);
 const features = new Map(garden.features.map((f) => [f.properties.id, f]));
 const HISTORY_DAYS = 365;
+const PREVIOUS_SHOWN = 4;
 
 // Per-phone memory. Storage can be unavailable (private mode): the app still works, it just forgets.
 const stored = {
@@ -32,6 +33,9 @@ const [pxX, pxY] = calibration.px_per_m;
 const scan = { url: scanUrl, width: imgW / pxX, height: imgH / pxY };
 const map = createMap($("map"), garden, scan, showZone);
 
+/** Zones on automatic watering aren't logged by hand. */
+const isAuto = (id) => features.get(id).properties.auto === true;
+
 function zoneTitle(id) {
   return features.get(id).properties.kind === "lawn" ? "Pelouse" : id;
 }
@@ -44,11 +48,26 @@ function showZone(id) {
   $("zone-id").textContent = zoneTitle(id);
   $("zone-name").textContent = name || (kind === "lawn" ? "" : "Pas encore de nom");
   $("zone-area").textContent = `${Math.round(area(features.get(id).geometry))} m²`;
-  const w = latest.get(id);
-  $("last-watering").textContent = w
-    ? `Dernier arrosage : ${describeDay(w.day)}, par ${w.by}`
-    : "Aucun arrosage enregistré";
+  $("water").hidden = isAuto(id);
+  const [last, ...previous] = isAuto(id) ? [] : zoneHistory(waterings, id);
+  $("last-watering").textContent = isAuto(id)
+    ? "Arrosage automatique"
+    : last ? `Dernier arrosage : ${describeDay(last.day)}, par ${last.by}` : "Aucun arrosage enregistré";
+  $("history").replaceChildren(...previous.slice(0, PREVIOUS_SHOWN).map((w) => {
+    const li = document.createElement("li");
+    li.textContent = `${describeDay(w.day)}, par ${w.by}`;
+    return li;
+  }));
 }
+
+/** Re-derive everything that depends on the data or on today's date. */
+function refresh() {
+  const today = isoDay();
+  map.setDryness((id) => (isAuto(id) ? "auto" : dryness(latest.get(id)?.day, today)));
+  if (currentZone) showZone(currentZone);
+}
+// A phone app stays open for days: "today" moves on while it's in the background.
+document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 
 $("close").addEventListener("click", () => map.select(null));
 $("fit").addEventListener("click", () => map.fit());
@@ -100,7 +119,7 @@ function startSync() {
   stopSync = watchWaterings(gardenCode, addDays(isoDay(), -HISTORY_DAYS), (list) => {
     waterings = list;
     latest = latestByZone(list);
-    if (currentZone) showZone(currentZone);
+    refresh();
   }, (err) => {
     console.error(err);
     if (err.code === "permission-denied") return askForCode("Ce code n'est plus valide.");

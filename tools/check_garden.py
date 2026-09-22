@@ -28,6 +28,15 @@ problems = []
 problems += [f"invalid geometry: {k}" for k, g in geoms.items() if not g.is_valid]
 problems += [f"duplicate id: {k}" for k in {i for i in ids if ids.count(i) > 1}]
 problems += [f"missing: {k}" for k in [*seeds["zones"], *seeds["lawns"]] if k not in geoms]
+for f in fc["features"]:
+    props = f["properties"]
+    if props["kind"] != "zone":
+        continue
+    if not isinstance(props.get("auto"), bool):
+        problems.append(f'{props["id"]}: "auto" must be true or false')
+    trees = props.get("trees")
+    if trees is not None and not (isinstance(trees, int) and not isinstance(trees, bool) and trees >= 0):
+        problems.append(f'{props["id"]}: "trees" must be a whole number >= 0, or null')
 valid = {k: g for k, g in geoms.items() if g.is_valid}   # overlap maths needs valid shapes
 for (ka, a), (kb, b) in itertools.combinations(valid.items(), 2):
     if (area := a.intersection(b).area) > 0.05:

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { addDays, describeDay, dryness, isoDay, knownNames, latestByZone, zoneHistory } from "./waterings.js";
+import { addDays, daysLabel, describeDay, dryness, isoDay, knownNames, latestByZone, zoneHistory } from "./waterings.js";
 
 describe("days", () => {
   test("isoDay uses the local calendar day, zero-padded", () => {
@@ -80,4 +80,15 @@ test("zoneHistory: only that zone, most recent day first, then latest entry", ()
     w("B3", "e", "2026-09-21", null),
   ], "B3");
   expect(history.map((h) => h.by)).toEqual(["d", "e", "c", "b", "a"]);
+});
+
+test.each([
+  [null, null],
+  ["2026-09-21", "auj."],
+  ["2026-09-20", "1 j"],
+  ["2026-09-15", "6 j"],
+  ["2026-08-22", "30 j"],
+  ["2026-09-22", "auj."],   // a day in the future (clock skew) never shows as negative
+])("daysLabel(%s) on 2026-09-21 → %s", (day, text) => {
+  expect(daysLabel(day, "2026-09-21")).toBe(text);
 });

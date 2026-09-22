@@ -59,6 +59,13 @@ export function dryness(lastDay, today = isoDay()) {
   return Math.min(Math.max(n - GREEN_DAYS, 0), MAX_LEVEL);
 }
 
+/** Short day count for a map label: "auj." today, otherwise "6 j". null if never watered. */
+export function daysLabel(lastDay, today = isoDay()) {
+  if (!lastDay) return null;
+  const n = Math.max(daysBetween(lastDay, today), 0);
+  return n === 0 ? "auj." : `${n} j`;
+}
+
 /** A zone's waterings, most recent first. */
 export function zoneHistory(waterings, zone) {
   const time = (w) => w.at?.getTime() ?? Infinity;   // pending entries (no server time yet) are newest

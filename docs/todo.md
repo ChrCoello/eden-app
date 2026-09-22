@@ -98,6 +98,8 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
       Known limit (validator): light green ↔ yellow are hard to tell apart with red–green colour
       blindness, and yellow↔light orange / dark orange↔red sit below the normal-vision floor (ΔE 12.6
       / 10.4 < 15). The zone sheet always shows the exact day. First version was a single orange ramp.
+      Mitigation (user OK'd): each watered zone's label has a second line with the day count
+      ("6 j", "auj."), so the map is readable without relying on colour.
 - [x] 2.7 Zone sheet: latest watering + up to 4 previous ones.
 - [x] 2.7b Zone attributes (user request, 2026-09-22) in `garden.json`, edited in `tools/editor.html`:
       `auto` (on automatic watering: blue on the map, "Arrosage automatique", no 💧 button) and

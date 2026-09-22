@@ -26,13 +26,14 @@ export function createMap(svg, garden, scan, onSelect) {
   const labels = el("g", { class: "labels" }, view);
 
   const byId = new Map();
+  const labelById = new Map();
   for (const f of garden.features) {
     const { id, kind } = f.properties;
     const shape = el("path", { d: svgPath(f.geometry), "fill-rule": "evenodd", class: `shape ${kind}` }, shapes);
     if (kind === "path") continue;
     shape.dataset.id = id;
     const [x, y] = labelPoint(f.geometry);
-    if (kind === "zone") el("text", { x, y, class: "label" }, labels).textContent = id;
+    if (kind === "zone") labelById.set(id, el("text", { x, y, class: "label" }, labels));
     byId.set(id, shape);
   }
 
@@ -123,6 +124,19 @@ export function createMap(svg, garden, scan, onSelect) {
     if (width && width !== fittedWidth) { fittedWidth = width; fit(); }
   }).observe(svg);
 
+  // Zone name, plus an optional smaller second line; the pair stays centred on the label point.
+  function setLabel(text, name, note) {
+    const x = text.getAttribute("x");
+    const line = (content, attrs) => {
+      const t = el("tspan", { x, ...attrs });
+      t.textContent = content;
+      return t;
+    };
+    text.replaceChildren(line(name, note ? { dy: "-0.55em" } : {}));
+    if (note) text.append(line(note, { dy: "1.15em", class: "note" }));
+  }
+  for (const [id, text] of labelById) setLabel(text, id, null);
+
   // ---- selection -----------------------------------------------------------------------
   let selected = null;
   function select(id) {
@@ -136,9 +150,11 @@ export function createMap(svg, garden, scan, onSelect) {
 
   return {
     select,
-    /** Colour zones: levelOf(id) → dryness 0..5, null for "never watered", or "auto". */
-    setDryness(levelOf) {
+    /** Colour zones and caption their labels: levelOf(id) → dryness 0..5, null for "never
+     *  watered", or "auto"; noteOf(id) → a second label line (e.g. "6 j"), or null for none. */
+    setDryness(levelOf, noteOf = () => null) {
       for (const [id, shape] of byId) shape.dataset.dry = levelOf(id) ?? "never";
+      for (const [id, text] of labelById) setLabel(text, id, noteOf(id));
     },
     fit: () => fit(),
     setScanVisible: (on) => scanImg.classList.toggle("visible", on),

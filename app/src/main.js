@@ -4,7 +4,9 @@ import scanUrl from "../../data/map_web.webp";
 import { addWatering, gardenExists, watchWaterings } from "./firebase.js";
 import { area } from "./geo.js";
 import { createMap } from "./map.js";
-import { addDays, describeDay, dryness, isoDay, knownNames, latestByZone, zoneHistory } from "./waterings.js";
+import {
+  addDays, daysLabel, describeDay, dryness, isoDay, knownNames, latestByZone, zoneHistory,
+} from "./waterings.js";
 import "./style.css";
 
 const $ = (id) => document.getElementById(id);
@@ -63,7 +65,11 @@ function showZone(id) {
 /** Re-derive everything that depends on the data or on today's date. */
 function refresh() {
   const today = isoDay();
-  map.setDryness((id) => (isAuto(id) ? "auto" : dryness(latest.get(id)?.day, today)));
+  map.setDryness(
+    (id) => (isAuto(id) ? "auto" : dryness(latest.get(id)?.day, today)),
+    // the day count repeats the colour in words: readable whatever your colour vision
+    (id) => (isAuto(id) ? null : daysLabel(latest.get(id)?.day, today)),
+  );
   if (currentZone) showZone(currentZone);
 }
 // A phone app stays open for days: "today" moves on while it's in the background.

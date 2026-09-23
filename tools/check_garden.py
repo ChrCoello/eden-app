@@ -4,7 +4,7 @@
 """Sanity-check data/garden.json and render it over the scan.
 
 Checks: valid geometries, ids unique and accepted by the Firestore rules,
-no overlaps, no holes.
+no overlaps. Gaps between zones are allowed and only listed.
 Run: uv run tools/check_garden.py [overlay.png]
 """
 import itertools
@@ -47,14 +47,17 @@ for (ka, a), (kb, b) in itertools.combinations(valid.items(), 2):
     if (area := a.intersection(b).area) > 0.05:
         problems.append(f"overlap {ka}/{kb}: {area:.2f} m2")
 union = shapely.union_all(list(valid.values()))
-if (n := len(shapely.get_parts(union))) > 1:
-    problems.append(f"garden is split into {n} pieces (gaps between cells)")
+# zones don't have to cover the garden: gaps are fine, listed for information only
 holes = [shapely.Polygon(r) for p in shapely.get_parts(union) for r in p.interiors]
-problems += [f"hole of {h.area:.2f} m2 near ({h.centroid.x:.0f}, {h.centroid.y:.0f})" for h in holes if h.area > 0.05]
+notes = [f"gap of {h.area:.1f} m2 near ({h.centroid.x:.0f}, {h.centroid.y:.0f})" for h in holes if h.area > 0.05]
+if (n := len(shapely.get_parts(union))) > 1:
+    notes.append(f"the zones form {n} separate pieces")
 
 zones = [g for f, g in zip(fc["features"], geoms.values()) if f["properties"]["kind"] == "zone"]
 print(f"{len(zones)} zones, {len(geoms)} features, garden {union.area:.0f} m2, "
       f"{sum(len(shapely.get_coordinates(g)) for g in geoms.values())} vertices")
+for note in notes:
+    print(f"note: {note}")
 if gone:
     print(f"note: seeded zones no longer in the file (renamed or merged?): {', '.join(gone)}")
 print("\n".join(problems) or "OK: no problems")

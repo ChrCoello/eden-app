@@ -31,10 +31,12 @@ describe("geometry helpers", () => {
 describe("garden.json", () => {
   const zones = garden.features.filter((f) => f.properties.kind === "zone");
 
-  test("has the 35 pencil zones with unique ids", () => {
-    const ids = zones.map((f) => f.properties.id);
-    expect(ids).toHaveLength(35);
-    expect(new Set(ids).size).toBe(35);
+  // Zones can be split, merged and renamed in the editor, so their number isn't fixed.
+  test("has zones with unique ids the Firestore rules accept", () => {
+    const ids = garden.features.map((f) => f.properties.id);
+    expect(zones.length).toBeGreaterThan(0);
+    expect(new Set(ids).size).toBe(ids.length);
+    for (const id of ids) expect(id).toMatch(/^[A-Za-z0-9_]{1,20}$/);   // app/firestore.rules
   });
 
   test.each(garden.features.map((f) => [f.properties.id, f]))("label of %s sits inside it", (_, f) => {

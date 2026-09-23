@@ -35,7 +35,7 @@ def carve(fc, branches, width, cid):
 
     band = shapely.union_all([l.buffer(width / 2, cap_style="flat", join_style="round", quad_segs=4) for l in lines])
     geoms = [shape(f["geometry"]) for f in feats]
-    # Gaps inside the garden (e.g. left by moving corners apart) that the band touches become chemin.
+    # Gaps between zones stay gaps, except the part the band covers, which becomes chemin.
     gaps = [shapely.Polygon(r) for p in shapely.get_parts(shapely.union_all(geoms)) for r in p.interiors]
     fill = shapely.union_all([h for h in gaps if h.intersects(band)])
     area = shapely.union_all([band, fill])
@@ -56,7 +56,7 @@ def carve(fc, branches, width, cid):
     for face in shapely.get_parts(shapely.polygonize(shapely.get_parts(edges))):
         p = face.representative_point()
         owner = next((i for i in hit if geoms[i].contains(p)), None)
-        if owner is None and fill.contains(p):
+        if owner is None and fill.contains(p) and band.contains(p):
             owner = target
         elif owner is None:
             continue                               # outside the touched features (e.g. a block inside a path loop)

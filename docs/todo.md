@@ -14,6 +14,8 @@ Source: `data/20260303_154351.PDF`, a scan (6900×8827 px JPEG) of the surveyor'
 - Map data = GeoJSON FeatureCollection in local meters (`data/garden.json`), rendered to SVG.
 - The zones are beds separated by grass walkways. Each zone cell also owns half of the walkway
   next to it, so the cells tile the garden with no dead space for tapping. The scan can be shown underneath.
+- (2026-09-23, user) Zones do **not** have to cover the whole garden: gaps are allowed and are never filled
+  automatically. `check_garden.py` only lists them; a chemin covers a gap only where it's drawn.
 - Zone names (legend) filled in later by the user.
 
 ## Phase 1 — Digitize the map

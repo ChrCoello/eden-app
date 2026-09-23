@@ -18,3 +18,19 @@
   screen space; after implementing it, measuring showed it was 16% *smaller* (the garden is taller
   than wide). Reverted.
 - Rule: any "X% better" claim in a proposal must come from a quick computation, not a visual guess.
+
+## Look at each hand edit before "repairing" it
+- 2026-09-23: after the user's A-block edits, I "filled back" every area that had left the garden outline,
+  assuming deleted corners were accidents. Rendering each spot showed most were deliberate: the user had
+  straightened jagged tracing artefacts around printed text ("4.00", "ht"). My fill put the artefacts back.
+- Rule: a diff against an older version says what changed, not whether it's wrong. Before reverting any
+  part of a hand edit, render that spot and ask whether it's a cleanup; fix only what is objectively broken
+  (invalid shapes, holes, T-junctions) and ask about the rest.
+
+## Don't turn my own design assumptions into rules the user must follow
+- 2026-09-23: I treated "zones tile the garden with no gaps" (my phase-1 design choice) as a hard rule: the
+  validator failed on gaps, the chemin tool filled whole gaps, and I proposed filling the user's gaps. The user:
+  "there is no constraint that all surfaces should be covered. Allow gaps."
+- Rule: when a check or tool enforces something, know whether the user asked for it or I assumed it. Only
+  enforce what's objectively broken (invalid shapes, overlaps, IDs the backend refuses); ask before
+  "fixing" anything else.

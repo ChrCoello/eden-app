@@ -31,6 +31,8 @@ Source: `data/20260303_154351.PDF`, a scan (6900×8827 px JPEG) of the surveyor'
 - [x] 1.4 Review/edit tool: `python3 tools/serve.py` → http://localhost:8000/tools/editor.html.
       Select/rename zones, set names, drag corners (shared corners move in every zone that has them),
       add/delete corners, undo, save straight to `data/garden.json`. Tested headlessly (drag + save).
+      Box delete (2026-09-23): shift-drag picks the selected zone's corners, Delete removes them (also from
+      the neighbour that shares them); junctions of 3+ shapes are kept. Tested headlessly (pick, Esc, delete, undo).
 - [x] 1.5 Validation: `uv run tools/check_garden.py [overlay.png]`: valid shapes, all seeds present,
       no overlaps, no holes, garden in one piece. Current result: OK, garden = 35,243 m² (3.5 ha).
 - [ ] 1.6 (User) Review the zones in the editor against what's really on the ground; fix borders.

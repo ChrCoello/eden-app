@@ -29,6 +29,8 @@
   .label { font-weight: 700; fill: #000; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
   .handle { fill: #fff; stroke: #000; vector-effect: non-scaling-stroke; stroke-width: 1; cursor: move; }
   .handle.shared { fill: var(--accent); }
+  .handle.picked { fill: #e00; }
+  .box { fill: rgba(230, 0, 0, .08); stroke: #e00; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 </style>
 </head>
 <body>
@@ -65,6 +67,7 @@
     <b>Move a corner</b> drag a handle (orange = shared, moves both zones)<br>
     <b>Add a corner</b> double-click an edge of the selected zone<br>
     <b>Delete a corner</b> shift-click a handle<br>
+    <b>Delete many corners</b> shift-drag a box around them, then Delete (junctions of 3+ shapes are kept)<br>
     <b>Undo</b> Ctrl+Z<br>
     Big mistakes: move the seed in <code>data/zone_seeds.json</code> and re-run
     <code>uv run tools/segment_zones.py</code> instead.
@@ -75,6 +78,7 @@ const $ = (id) => document.getElementById(id);
 const svg = $("map"), view = $("view");
 const NS = "http://www.w3.org/2000/svg";
 let fc, px_per_m, selected = null, dirty = false, undo = [];
+let picked = new Set();                           // keys of corners picked with the box
 let k = 1, tx = 0, ty = 0;                        // screen px per meter, pan offset
 let scanW, scanH;                                 // scan size in meters
 
@@ -146,7 +150,7 @@ function renderHandles() {
     const c = document.createElementNS(NS, "circle");
     c.setAttribute("cx", p[0]); c.setAttribute("cy", -p[1]); c.setAttribute("r", 5 / k);
     const shared = new Set(refsOf(kk).map(([r]) => r)).size > 1;
-    c.setAttribute("class", "handle" + (shared ? " shared" : ""));
+    c.setAttribute("class", "handle" + (shared ? " shared" : "") + (picked.has(kk) ? " picked" : ""));
     c.dataset.key = kk;
     g.append(c);
   }
@@ -206,7 +210,14 @@ let drag = null, moved = false;
 svg.addEventListener("mousedown", (e) => {
   moved = false;
   const h = e.target.closest(".handle");
-  if (h && e.shiftKey) return deleteVertex(h.dataset.key);
+  if (h && e.shiftKey) return deleteVertices([h.dataset.key]);
+  if (e.shiftKey && selected) {
+    const box = document.createElementNS(NS, "rect");
+    box.setAttribute("class", "box");
+    $("handles").append(box);
+    drag = { box, start: toWorld(e) };
+    return;
+  }
   if (h) { snapshot(); drag = { refs: refsOf(h.dataset.key), el: h }; return; }
   drag = { pan: true, x: e.clientX - tx, y: e.clientY - ty };
   svg.classList.add("panning");
@@ -215,13 +226,21 @@ window.addEventListener("mousemove", (e) => {
   if (!drag) return;
   moved = true;
   if (drag.pan) { tx = e.clientX - drag.x; ty = e.clientY - drag.y; return applyView(); }
+  if (drag.box) {
+    const [[x0, y0], [x1, y1]] = [drag.start, toWorld(e)];
+    drag.end = [x1, y1];
+    drag.box.setAttribute("x", Math.min(x0, x1)); drag.box.setAttribute("y", -Math.max(y0, y1));
+    drag.box.setAttribute("width", Math.abs(x1 - x0)); drag.box.setAttribute("height", Math.abs(y1 - y0));
+    return;
+  }
   const [x, y] = toWorld(e).map(r2);
   for (const [r, i] of drag.refs) r[i] = [x, y];
   drag.el.setAttribute("cx", x); drag.el.setAttribute("cy", -y);
   redrawCells();
 });
 window.addEventListener("mouseup", () => {
-  if (drag && !drag.pan) { markDirty(); render(); }
+  if (drag?.box) { pickInBox(drag.start, drag.end ?? drag.start); drag.box.remove(); }
+  else if (drag && !drag.pan) { markDirty(); render(); }
   drag = null; svg.classList.remove("panning");
 });
 svg.addEventListener("dblclick", (e) => {
@@ -241,16 +260,32 @@ svg.addEventListener("dblclick", (e) => {
   }
   markDirty(); render();
 });
-function deleteVertex(kk) {
-  const refs = refsOf(kk);
-  if (refs.some(([r]) => r.length <= 4)) return status("A shape needs at least 3 corners.");
+/** Picks the selected zone's corners inside the box, except junctions of 3+ rings. */
+function pickInBox([x0, y0], [x1, y1]) {
+  const [xa, xb, ya, yb] = [Math.min(x0, x1), Math.max(x0, x1), Math.min(y0, y1), Math.max(y0, y1)];
+  const inside = new Set();
+  for (const r of rings(selected)) for (const [x, y] of r) if (x >= xa && x <= xb && y >= ya && y <= yb) inside.add(key([x, y]));
+  const ringsOf = new Map([...inside].map((kk) => [kk, new Set()]));
+  for (const f of fc.features) for (const r of rings(f)) for (const p of r) ringsOf.get(key(p))?.add(r);
+  picked = new Set([...inside].filter((kk) => ringsOf.get(kk).size < 3));
+  const kept = inside.size - picked.size;
+  status(`${picked.size} corner(s) picked` + (kept ? `, ${kept} junction(s) kept` : "") + (picked.size ? ". Delete to remove, Esc to cancel." : "."));
+  renderHandles();
+}
+/** Removes the corners from every ring that has them (shared corners go from both zones). */
+function deleteVertices(keys) {
+  const del = new Set(keys), hits = new Map();
+  for (const f of fc.features) for (const r of rings(f)) r.forEach((p, i) => { if (del.has(key(p))) hits.set(r, [...(hits.get(r) || []), i]); });
+  for (const [r, idx] of hits) {
+    const left = new Set(r.map(key).filter((kk) => !del.has(kk))).size;
+    if (left < 3) return status("A shape needs at least 3 corners: pick fewer.");
+  }
   snapshot();
-  const byRing = new Map();
-  for (const [r, i] of refs) byRing.set(r, [...(byRing.get(r) || []), i]);
-  for (const [r, idx] of byRing) {
+  for (const [r, idx] of hits) {
     for (const i of idx.sort((a, b) => b - a)) r.splice(i, 1);
     if (key(r[0]) !== key(r[r.length - 1])) r.push([...r[0]]);   // removed the closing vertex: re-close
   }
+  picked = new Set(); status(`Deleted ${del.size} corner(s).`);
   markDirty(); render();
 }
 function segDist([px, py], [ax, ay], [bx, by]) {
@@ -260,7 +295,7 @@ function segDist([px, py], [ax, ay], [bx, by]) {
 function redrawCells() {
   for (const el of $("cells").children) el.setAttribute("d", pathD(el.__f));
 }
-function select(f) { selected = f; render(); }
+function select(f) { selected = f; picked = new Set(); render(); }
 
 // panel edits
 $("f-id").addEventListener("change", (e) => {
@@ -295,10 +330,14 @@ window.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key === "z" && undo.length && document.activeElement.tagName !== "INPUT") {
     e.preventDefault();
     const s = undo.pop();
-    fc = JSON.parse(s.json); selected = s.sel == null ? null : fc.features[s.sel];
+    fc = JSON.parse(s.json); selected = s.sel == null ? null : fc.features[s.sel]; picked = new Set();
     markDirty(); render();
   }
-  if (e.key === "Escape") select(null);
+  if ((e.key === "Delete" || e.key === "Backspace") && picked.size && document.activeElement.tagName !== "INPUT") { e.preventDefault(); deleteVertices(picked); }
+  if (e.key === "Escape") {
+    if (picked.size) { picked = new Set(); status(""); renderHandles(); }
+    else select(null);
+  }
 });
 function markDirty() { dirty = true; $("save").className = "dirty"; }
 function status(msg) { $("status").textContent = msg; }

@@ -17,8 +17,8 @@
   button { cursor: pointer; margin-top: 6px; }
   #save.dirty { background: var(--accent); font-weight: 600; }
   #status { margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 1em; }
-  #list { display: grid; grid-template-columns: repeat(5, 1fr); gap: 3px; }
-  #list button { margin: 0; padding: 3px 0; font-size: 12px; }
+  #list { display: flex; flex-wrap: wrap; gap: 3px; }
+  #list button { flex: 1 0 48px; width: auto; margin: 0; padding: 3px 4px; font-size: 12px; }
   #list button.sel { outline: 2px solid var(--accent); }
   .help { font-size: 12px; color: var(--muted); line-height: 1.5; }
   .help b { color: var(--ink); }
@@ -26,15 +26,21 @@
   .cell.path { fill: rgba(40, 90, 255, .12); stroke: #2a5cff; }
   .cell.lawn { fill: rgba(120, 200, 80, .10); stroke: #4a8a2a; }
   .cell.sel { stroke: var(--accent); stroke-width: 3; }
-  .label { font-weight: 700; fill: #000; paint-order: stroke; stroke: #fff; stroke-width: 3px; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
+  .label { font-weight: 700; fill: #000; paint-order: stroke; stroke: #fff; pointer-events: none; text-anchor: middle; dominant-baseline: middle; }
   .handle { fill: #fff; stroke: #000; vector-effect: non-scaling-stroke; stroke-width: 1; cursor: move; }
   .handle.shared { fill: var(--accent); }
   .handle.picked { fill: #e00; }
+  .cell.chemin { fill: rgba(215, 160, 80, .45); stroke: #a0662a; }
+  .draft-band { fill: none; stroke: rgba(215, 130, 30, .45); stroke-linejoin: round; stroke-linecap: butt; pointer-events: none; }
+  .draft-line { fill: none; stroke: #8a4b00; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
+  .draft-pt { fill: #8a4b00; pointer-events: none; }
+  #map.drawing { cursor: crosshair; }
+  .row { display: flex; gap: 6px; } .row > div { flex: 1; min-width: 0; }
   .box { fill: rgba(230, 0, 0, .08); stroke: #e00; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 </style>
 </head>
 <body>
-<svg id="map"><g id="view"><image id="scan" href="../data/map.jpg"/><g id="cells"></g><g id="labels"></g><g id="handles"></g></g></svg>
+<svg id="map"><g id="view"><image id="scan" href="../data/map.jpg"/><g id="cells"></g><g id="labels"></g><g id="handles"></g><g id="draft"></g></g></svg>
 <aside>
   <h1>Garden zone editor</h1>
   <button id="save">Save</button>
@@ -44,7 +50,7 @@
   <div id="selected">
     <label>ID</label><input id="f-id">
     <label>Kind</label>
-    <select id="f-kind"><option>zone</option><option>lawn</option><option>path</option></select>
+    <select id="f-kind"><option>zone</option><option>lawn</option><option>path</option><option>chemin</option></select>
     <label>Name</label><input id="f-name" placeholder="e.g. Section Acer">
     <div id="zone-only">
       <label><input id="f-auto" type="checkbox" style="width:auto"> Automatic watering (no manual logging)</label>
@@ -52,6 +58,19 @@
     </div>
     <label>Area</label><div id="f-area"></div>
   </div>
+
+  <h2>Chemin</h2>
+  <div class="row">
+    <div><label>ID</label><input id="c-id" placeholder="chemin_D"></div>
+    <div><label>Width (m)</label><input id="c-width" type="number" min="0.3" max="10" step="0.1" value="2.5"></div>
+  </div>
+  <button id="c-draw">Draw a chemin</button>
+  <div id="c-tools" hidden>
+    <div class="help">Click along the <b>middle</b> of the chemin, and end each line on the gravel path.
+      <b>Enter</b> or double-click ends a line; start the next one anywhere. <b>Backspace</b> removes the last point, <b>Esc</b> cancels.</div>
+    <button id="c-apply">Apply</button><button id="c-cancel">Cancel</button>
+  </div>
+  <div id="c-report" class="help"></div>
 
   <h2>View</h2>
   <label>Scan opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.8">
@@ -68,6 +87,8 @@
     <b>Add a corner</b> double-click an edge of the selected zone<br>
     <b>Delete a corner</b> shift-click a handle<br>
     <b>Delete many corners</b> shift-drag a box around them, then Delete (junctions of 3+ shapes are kept)<br>
+    <b>Chemin</b> (walkway) "Draw a chemin", click its middle line; Apply cuts it out of the zones.
+    Needs <code>uv run tools/serve.py</code>. Drawing again with the same ID adds to it<br>
     <b>Undo</b> Ctrl+Z<br>
     Big mistakes: move the seed in <code>data/zone_seeds.json</code> and re-run
     <code>uv run tools/segment_zones.py</code> instead.
@@ -126,7 +147,7 @@ function render() {
     p.setAttribute("class", `cell ${f.properties.kind}` + (f === selected ? " sel" : ""));
     if (f.properties.kind === "zone") p.setAttribute("fill", `hsla(${hash(f.properties.id) % 360},70%,55%,.22)`);
     p.__f = f;
-    p.addEventListener("click", () => { if (!moved) select(f); });
+    p.addEventListener("click", () => { if (!moved && !chemin) select(f); });
     cells.append(p);
     if (f.properties.kind !== "path") {
       const [x, y] = labelPoint(f), t = document.createElementNS(NS, "text");
@@ -182,8 +203,10 @@ function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) 
 function applyView() {
   view.setAttribute("transform", `translate(${tx},${ty}) scale(${k})`);
   $("labels").style.fontSize = `${14 / k}px`;
+  $("labels").style.strokeWidth = `${3 / k}px`;                  // halo: constant on screen
   $("labels").style.display = $("show-labels").checked ? "" : "none";
   for (const c of $("handles").children) c.setAttribute("r", 5 / k);
+  for (const c of $("draft").querySelectorAll("circle")) c.setAttribute("r", 3 / k);
 }
 function toWorld(e) {
   const b = svg.getBoundingClientRect();
@@ -209,9 +232,9 @@ svg.addEventListener("wheel", (e) => {
 let drag = null, moved = false;
 svg.addEventListener("mousedown", (e) => {
   moved = false;
-  const h = e.target.closest(".handle");
+  const h = !chemin && e.target.closest(".handle");
   if (h && e.shiftKey) return deleteVertices([h.dataset.key]);
-  if (e.shiftKey && selected) {
+  if (e.shiftKey && selected && !chemin) {
     const box = document.createElementNS(NS, "rect");
     box.setAttribute("class", "box");
     $("handles").append(box);
@@ -238,12 +261,14 @@ window.addEventListener("mousemove", (e) => {
   drag.el.setAttribute("cx", x); drag.el.setAttribute("cy", -y);
   redrawCells();
 });
-window.addEventListener("mouseup", () => {
+window.addEventListener("mouseup", (e) => {
+  if (chemin && drag?.pan && !moved) addPoint(toWorld(e));
   if (drag?.box) { pickInBox(drag.start, drag.end ?? drag.start); drag.box.remove(); }
   else if (drag && !drag.pan) { markDirty(); render(); }
   drag = null; svg.classList.remove("panning");
 });
 svg.addEventListener("dblclick", (e) => {
+  if (chemin) return endBranch();
   if (!selected) return;
   const p = toWorld(e);
   let best = null;
@@ -321,12 +346,75 @@ $("f-trees").addEventListener("change", (e) => {
 $("opacity").addEventListener("input", (e) => ($("scan").style.opacity = e.target.value));
 $("show-labels").addEventListener("change", applyView);
 
+// ---- chemin (walkway) drawing: middle lines, carved by tools/serve.py -----------------
+let chemin = null;                                // {branches: [[x, y]...][]} while drawing; last = current
+function startChemin() {
+  const z = selected?.properties;
+  if (!$("c-id").value.trim()) $("c-id").value = z?.kind === "zone" ? `chemin_${z.id[0]}` : "chemin";
+  chemin = { branches: [[]] };
+  $("c-tools").hidden = false; $("c-draw").hidden = true; svg.classList.add("drawing");
+  status(""); renderDraft();
+}
+function stopChemin() {
+  chemin = null;
+  $("c-tools").hidden = true; $("c-draw").hidden = false; svg.classList.remove("drawing");
+  renderDraft();
+}
+function addPoint(p) { chemin.branches.at(-1).push(p.map(r2)); renderDraft(); }
+function endBranch() {
+  const b = chemin.branches.at(-1);
+  if (b.length >= 2 && Math.hypot(b.at(-1)[0] - b.at(-2)[0], b.at(-1)[1] - b.at(-2)[1]) < 0.3) b.pop();  // double-click's 2nd click
+  if (b.length >= 2) chemin.branches.push([]);
+  renderDraft();
+}
+function removePoint() {
+  if (!chemin.branches.at(-1).length && chemin.branches.length > 1) chemin.branches.pop();
+  chemin.branches.at(-1).pop();
+  renderDraft();
+}
+function renderDraft() {
+  const g = $("draft");
+  g.replaceChildren();
+  if (!chemin) return;
+  const add = (name, attrs) => { const n = document.createElementNS(NS, name); for (const a in attrs) n.setAttribute(a, attrs[a]); g.append(n); };
+  for (const b of chemin.branches) {
+    const points = b.map(([x, y]) => `${x},${-y}`).join(" ");
+    add("polyline", { points, class: "draft-band", "stroke-width": Number($("c-width").value) || 0 });   // meters: the real width
+    add("polyline", { points, class: "draft-line" });
+    for (const [x, y] of b) add("circle", { cx: x, cy: -y, r: 3 / k, class: "draft-pt" });
+  }
+}
+async function applyChemin() {
+  const id = $("c-id").value.trim(), branches = chemin.branches.filter((b) => b.length >= 2);
+  const res = await fetch("/carve", {
+    method: "POST",
+    body: JSON.stringify({ garden: fc, branches, width: Number($("c-width").value), id }),
+  }).catch(() => null);
+  const out = await res?.json().catch(() => null);
+  if (!res?.ok) return status(out?.error ?? `Chemin failed: ${res?.status ?? "no answer"} (is tools/serve.py running?)`);
+  snapshot();
+  fc = out.garden;
+  selected = fc.features.find((f) => f.properties.id === id);
+  stopChemin(); markDirty(); render();
+  $("c-report").replaceChildren(...out.report.map((line) => Object.assign(document.createElement("div"), { textContent: line })));
+  status(`Carved ${id}: check it, then Save.`);
+}
+$("c-draw").onclick = startChemin;
+$("c-cancel").onclick = stopChemin;
+$("c-apply").onclick = applyChemin;
+$("c-width").addEventListener("input", renderDraft);
+
 // ---- undo / save -----------------------------------------------------------------------
 function snapshot() {
   undo.push({ json: JSON.stringify(fc), sel: selected && fc.features.indexOf(selected) });
   if (undo.length > 100) undo.shift();
 }
 window.addEventListener("keydown", (e) => {
+  if (chemin && document.activeElement.tagName !== "INPUT") {
+    if (e.key === "Enter") return endBranch();
+    if (e.key === "Backspace") { e.preventDefault(); return removePoint(); }
+    if (e.key === "Escape") return stopChemin();
+  }
   if ((e.ctrlKey || e.metaKey) && e.key === "z" && undo.length && document.activeElement.tagName !== "INPUT") {
     e.preventDefault();
     const s = undo.pop();

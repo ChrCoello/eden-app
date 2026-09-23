@@ -9,6 +9,7 @@
   --zone-edge: #f5f8f2;
   --lawn: #d6e9c6;
   --path: #faf8f2;   /* gravel: recessive, not data */
+  --chemin: #c6ab84; /* grass walkway between beds: ΔE ≥ 16 from every zone colour, grey and blue */
   --selected: var(--ink);   /* visible on every fill: orange, grey and the automatic blue */
   /* days since watering, user's scale: green (0–4 j) → light green → yellow → light orange →
      dark orange → red (9 j +). Adjacent steps can't all be told apart with red–green colour
@@ -39,6 +40,7 @@
     --zone-edge: #121a14;
     --lawn: #2a3d2d;
     --path: #2c332e;
+    --chemin: #6b5a3f;
     --dry-0: #3a8a42;
     --dry-1: #86c24a;
     --dry-2: #e0b81f;
@@ -106,7 +108,8 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
 .shape.zone { fill: var(--zone); stroke: var(--zone-edge); stroke-width: 1.5; }
 .shape.lawn { fill: var(--lawn); stroke: var(--zone-edge); stroke-width: 1.5; }
 .shape.path { fill: var(--path); pointer-events: none; }
-.scan.visible ~ g .shape.zone, .scan.visible ~ g .shape.lawn { fill-opacity: 0.45; }
+.shape.chemin { fill: var(--chemin); stroke: var(--zone-edge); stroke-width: 1.5; pointer-events: none; }
+.scan.visible ~ g .shape.zone, .scan.visible ~ g .shape.lawn, .scan.visible ~ g .shape.chemin { fill-opacity: 0.45; }
 .shape[data-dry="0"], #legend [data-dry="0"] { fill: var(--dry-0); background: var(--dry-0); }
 .shape[data-dry="1"], #legend [data-dry="1"] { fill: var(--dry-1); background: var(--dry-1); }
 .shape[data-dry="2"], #legend [data-dry="2"] { fill: var(--dry-2); background: var(--dry-2); }

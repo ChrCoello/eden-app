@@ -28,7 +28,7 @@ Source: `data/20260303_154351.PDF`, a scan (6900×8827 px JPEG) of the surveyor'
       (`data/zone_seeds.json`) grows until it meets pencil lines, with paths/ink/paper as walls. Vectorized along
       pixel edges + topology-preserving simplification, so neighbours share identical borders.
       → `tools/segment_zones.py` → `data/garden.json` (35 zones, 2 lawns, paths; 3433 vertices, 60 KB).
-- [x] 1.4 Review/edit tool: `python3 tools/serve.py` → http://localhost:8000/tools/editor.html.
+- [x] 1.4 Review/edit tool: `uv run tools/serve.py` → http://localhost:8000/tools/editor.html.
       Select/rename zones, set names, drag corners (shared corners move in every zone that has them),
       add/delete corners, undo, save straight to `data/garden.json`. Tested headlessly (drag + save).
       Box delete (2026-09-23): shift-drag picks the selected zone's corners, Delete removes them (also from
@@ -110,6 +110,20 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
 - [ ] 2.8 Rules tests written (`app/rules/`, run in CI with Java 21: can't run locally, Java 11 here);
       unit tests done (64); Playwright phone smoke test still to add to the repo.
 - [ ] 2.9 Deploy, then test on a real phone with you (and Dad).
+- [x] 2.10 Chemins (user request, 2026-09-23): grass walkways between beds (pencil double lines), e.g. the
+      X between D1–D4, and in other blocks too. Auto-detection from the scan was tried and rejected
+      (pencil lines have breaks; the paper fold and dimension lines look like walkways too).
+  - [x] `tools/chemin.py`: carve(garden, middle lines, width, id) with shapely. The band cuts zones/lawns only
+        (never the gravel paths); all affected borders are noded together and each shape is rebuilt from the
+        faces, so corners stay shared (editable afterwards). Same id → added to that chemin.
+  - [x] `tools/serve.py`: POST /carve (run with `uv run tools/serve.py` for shapely).
+  - [x] Editor: "Chemin" panel: id + width (2.5 m); click the middle line, Enter ends a branch, preview at
+        full width, Apply / Cancel; kind `chemin` in the Kind list.
+  - [x] App: kind `chemin` has its own colour (sand #c6ab84 / dark #6b5a3f: CIEDE2000 ≥ 15.9 from every
+        map colour), not tappable, no label.
+  - [x] Verify: headless editor run on D (draw, apply, undo, errors), `check_garden.py` OK, app on a phone
+        viewport (light + dark), 200 randomised carves (jittered lines, widths 1–4 m, adding to a chemin).
+  - [ ] (User) Draw and save the real chemins: D first, then the other blocks.
 
 ### Later (not in the first version)
 
@@ -117,6 +131,13 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
 - Notes/photos per watering, reminders, GPS "you are here".
 
 ## Review
+
+Phase 2.10 (2026-09-23): the first carve used per-face rounding to cm and failed on real clicks
+(GEOS TopologyException on a sliver); fixed by snap-rounding the whole arrangement once (`grid_size`).
+The randomised test then found two more bugs: adding to a chemin without touching it dropped the old part,
+and a band ending within a cm of a zone opened a hairline gap (neighbour not noded). Both fixed; 200/200 clean.
+Found on the way: the hand edits of commit 3746df8 left two holes (40 m² at the D crossing, now filled by
+the chemin, and 14.5 m² of gravel between D4 and E3, still open).
 
 Phase 2.2–2.3 (2026-09-21): testing the map zoomed in revealed real gaps in `garden.json`
 (thin unassigned strips along path outlines, open to the property edge, so the "no holes" check

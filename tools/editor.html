@@ -35,6 +35,9 @@
   .draft-line { fill: none; stroke: #8a4b00; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
   .draft-pt { fill: #8a4b00; pointer-events: none; }
   #map.drawing { cursor: crosshair; }
+  #map.merging .cell { cursor: copy; }
+  .tool { margin: 8px 0; padding: 8px; border: 2px solid var(--accent); border-radius: 6px; background: #fff; }
+  #report:not(:empty) { margin-top: 6px; }
   .row { display: flex; gap: 6px; } .row > div { flex: 1; min-width: 0; }
   .box { fill: rgba(230, 0, 0, .08); stroke: #e00; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 </style>
@@ -45,6 +48,16 @@
   <h1>Garden zone editor</h1>
   <button id="save">Save</button>
   <div id="status"></div>
+  <div id="draw-tools" class="tool" hidden>
+    <div id="draw-help" class="help"></div>
+    <div class="row"><div><button id="draw-apply">Apply</button></div><div><button id="draw-cancel">Cancel</button></div></div>
+  </div>
+  <div id="naming" class="tool" hidden>
+    <div id="n-help" class="help"></div>
+    <label>New zone ID</label><input id="n-id" placeholder="e.g. A6" autocomplete="off">
+    <button id="n-ok">OK</button>
+  </div>
+  <div id="report" class="help"></div>
 
   <h2>Selected</h2>
   <div id="selected">
@@ -57,6 +70,10 @@
       <label>Trees</label><input id="f-trees" type="number" min="0" step="1" placeholder="not counted yet">
     </div>
     <label>Area</label><div id="f-area"></div>
+    <div class="row">
+      <div><button id="z-split" title="Draw one or more lines across the zone">Split this zone</button></div>
+      <div><button id="z-merge" title="Then click a neighbouring zone">Merge with…</button></div>
+    </div>
   </div>
 
   <h2>Chemin</h2>
@@ -65,12 +82,6 @@
     <div><label>Width (m)</label><input id="c-width" type="number" min="0.3" max="10" step="0.1" value="2.5"></div>
   </div>
   <button id="c-draw">Draw a chemin</button>
-  <div id="c-tools" hidden>
-    <div class="help">Click along the <b>middle</b> of the chemin, and end each line on the gravel path.
-      <b>Enter</b> or double-click ends a line; start the next one anywhere. <b>Backspace</b> removes the last point, <b>Esc</b> cancels.</div>
-    <button id="c-apply">Apply</button><button id="c-cancel">Cancel</button>
-  </div>
-  <div id="c-report" class="help"></div>
 
   <h2>View</h2>
   <label>Scan opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.8">
@@ -89,6 +100,8 @@
     <b>Delete many corners</b> shift-drag a box around them, then Delete (junctions of 3+ shapes are kept)<br>
     <b>Chemin</b> (walkway) "Draw a chemin", click its middle line; Apply cuts it out of the zones.
     Needs <code>uv run tools/serve.py</code>. Drawing again with the same ID adds to it<br>
+    <b>Split a zone</b> select it, "Split this zone", draw lines across it, Apply, then give each piece an ID<br>
+    <b>Merge zones</b> select one, "Merge with…", click its neighbour: the first keeps its ID and settings<br>
     <b>Undo</b> Ctrl+Z<br>
     Big mistakes: move the seed in <code>data/zone_seeds.json</code> and re-run
     <code>uv run tools/segment_zones.py</code> instead.
@@ -127,7 +140,21 @@ function labelPoint(f) {
     const [x0, y0] = outer[i], [x1, y1] = outer[i + 1], c = x0 * y1 - x1 * y0;
     a += c; cx += (x0 + x1) * c; cy += (y0 + y1) * c;
   }
-  return [cx / (3 * a), cy / (3 * a)];
+  [cx, cy] = [cx / (3 * a), cy / (3 * a)];
+  // The centroid of an L or a thin bent strip can fall outside: then use the middle of the widest
+  // inside stretch of the horizontal line through it.
+  const main = polys(f.geometry).find((p) => p[0] === outer), xs = [];
+  for (const r of main) for (let i = 0; i < r.length - 1; i++) {
+    const [[x0, y0], [x1, y1]] = [r[i], r[i + 1]];
+    if ((y0 > cy) !== (y1 > cy)) xs.push(x0 + ((cy - y0) * (x1 - x0)) / (y1 - y0));
+  }
+  xs.sort((p, q) => p - q);
+  let best = null;
+  for (let i = 0; i + 1 < xs.length; i += 2) {
+    if (cx >= xs[i] && cx <= xs[i + 1]) return [cx, cy];
+    if (!best || xs[i + 1] - xs[i] > best[1] - best[0]) best = [xs[i], xs[i + 1]];
+  }
+  return best ? [(best[0] + best[1]) / 2, cy] : [cx, cy];
 }
 /** Every occurrence of a vertex across all features: shared corners move together. */
 function refsOf(k0) {
@@ -147,7 +174,7 @@ function render() {
     p.setAttribute("class", `cell ${f.properties.kind}` + (f === selected ? " sel" : ""));
     if (f.properties.kind === "zone") p.setAttribute("fill", `hsla(${hash(f.properties.id) % 360},70%,55%,.22)`);
     p.__f = f;
-    p.addEventListener("click", () => { if (!moved && !chemin) select(f); });
+    p.addEventListener("click", () => { if (moved || draw) return; if (merging) return mergeWith(f); select(f); });
     cells.append(p);
     if (f.properties.kind !== "path") {
       const [x, y] = labelPoint(f), t = document.createElementNS(NS, "text");
@@ -195,6 +222,8 @@ function renderPanel() {
   $("zone-only").hidden = !isZone;
   $("f-auto").checked = isZone && p.auto === true;
   $("f-trees").value = isZone && p.trees != null ? p.trees : "";
+  $("z-split").disabled = draw || !["zone", "lawn"].includes(p?.kind);
+  $("z-merge").disabled = draw || !["zone", "lawn", "chemin"].includes(p?.kind);
   $("save").className = dirty ? "dirty" : "";
 }
 function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) * 47; }
@@ -232,9 +261,9 @@ svg.addEventListener("wheel", (e) => {
 let drag = null, moved = false;
 svg.addEventListener("mousedown", (e) => {
   moved = false;
-  const h = !chemin && e.target.closest(".handle");
+  const h = !draw && e.target.closest(".handle");
   if (h && e.shiftKey) return deleteVertices([h.dataset.key]);
-  if (e.shiftKey && selected && !chemin) {
+  if (e.shiftKey && selected && !draw) {
     const box = document.createElementNS(NS, "rect");
     box.setAttribute("class", "box");
     $("handles").append(box);
@@ -262,13 +291,13 @@ window.addEventListener("mousemove", (e) => {
   redrawCells();
 });
 window.addEventListener("mouseup", (e) => {
-  if (chemin && drag?.pan && !moved) addPoint(toWorld(e));
+  if (draw && drag?.pan && !moved) addPoint(toWorld(e));
   if (drag?.box) { pickInBox(drag.start, drag.end ?? drag.start); drag.box.remove(); }
   else if (drag && !drag.pan) { markDirty(); render(); }
   drag = null; svg.classList.remove("panning");
 });
 svg.addEventListener("dblclick", (e) => {
-  if (chemin) return endBranch();
+  if (draw) return endBranch();
   if (!selected) return;
   const p = toWorld(e);
   let best = null;
@@ -325,7 +354,8 @@ function select(f) { selected = f; picked = new Set(); render(); }
 // panel edits
 $("f-id").addEventListener("change", (e) => {
   const v = e.target.value.trim();
-  if (!v || fc.features.some((f) => f !== selected && f.properties.id === v)) { status(`ID "${v}" is empty or taken.`); return renderPanel(); }
+  const problem = idProblem(v, selected);
+  if (problem) { status(problem); return renderPanel(); }
   snapshot(); selected.properties.id = v; markDirty(); render();
 });
 $("f-kind").addEventListener("change", (e) => {
@@ -346,63 +376,137 @@ $("f-trees").addEventListener("change", (e) => {
 $("opacity").addEventListener("input", (e) => ($("scan").style.opacity = e.target.value));
 $("show-labels").addEventListener("change", applyView);
 
-// ---- chemin (walkway) drawing: middle lines, carved by tools/serve.py -----------------
-let chemin = null;                                // {branches: [[x, y]...][]} while drawing; last = current
-function startChemin() {
-  const z = selected?.properties;
-  if (!$("c-id").value.trim()) $("c-id").value = z?.kind === "zone" ? `chemin_${z.id[0]}` : "chemin";
-  chemin = { branches: [[]] };
-  $("c-tools").hidden = false; $("c-draw").hidden = true; svg.classList.add("drawing");
-  status(""); renderDraft();
+// ---- drawing lines: a chemin's middle lines (carved) or the cut lines of a split ---------
+// Geometry is done by tools/serve.py (shapely); the editor only draws and shows the result.
+let draw = null;                                  // {mode: "chemin"|"split", branches: [[x, y]...][]}; last = current
+const HELP = {
+  chemin: `Click along the <b>middle</b> of the chemin, and end each line on the gravel path.`,
+  split: `Click a line <b>across</b> the zone, from border to border (a bit past is fine). Two lines make 3 zones.`,
+};
+function startDraw(mode) {
+  stopMerge();
+  draw = { mode, branches: [[]] };
+  $("draw-help").innerHTML = HELP[mode] + ` <b>Enter</b> or double-click ends a line; start the next one anywhere.
+    <b>Backspace</b> removes the last point, <b>Esc</b> cancels.`;
+  $("draw-tools").hidden = false; svg.classList.add("drawing");
+  status(""); renderDraft(); renderPanel();
 }
-function stopChemin() {
-  chemin = null;
-  $("c-tools").hidden = true; $("c-draw").hidden = false; svg.classList.remove("drawing");
-  renderDraft();
+function stopDraw() {
+  draw = null;
+  $("draw-tools").hidden = true; svg.classList.remove("drawing");
+  renderDraft(); renderPanel();
 }
-function addPoint(p) { chemin.branches.at(-1).push(p.map(r2)); renderDraft(); }
+function addPoint(p) { draw.branches.at(-1).push(p.map(r2)); renderDraft(); }
 function endBranch() {
-  const b = chemin.branches.at(-1);
+  const b = draw.branches.at(-1);
   if (b.length >= 2 && Math.hypot(b.at(-1)[0] - b.at(-2)[0], b.at(-1)[1] - b.at(-2)[1]) < 0.3) b.pop();  // double-click's 2nd click
-  if (b.length >= 2) chemin.branches.push([]);
+  if (b.length >= 2) draw.branches.push([]);
   renderDraft();
 }
 function removePoint() {
-  if (!chemin.branches.at(-1).length && chemin.branches.length > 1) chemin.branches.pop();
-  chemin.branches.at(-1).pop();
+  if (!draw.branches.at(-1).length && draw.branches.length > 1) draw.branches.pop();
+  draw.branches.at(-1).pop();
   renderDraft();
 }
 function renderDraft() {
   const g = $("draft");
   g.replaceChildren();
-  if (!chemin) return;
+  if (!draw) return;
   const add = (name, attrs) => { const n = document.createElementNS(NS, name); for (const a in attrs) n.setAttribute(a, attrs[a]); g.append(n); };
-  for (const b of chemin.branches) {
+  for (const b of draw.branches) {
     const points = b.map(([x, y]) => `${x},${-y}`).join(" ");
-    add("polyline", { points, class: "draft-band", "stroke-width": Number($("c-width").value) || 0 });   // meters: the real width
+    if (draw.mode === "chemin") add("polyline", { points, class: "draft-band", "stroke-width": Number($("c-width").value) || 0 });   // meters
     add("polyline", { points, class: "draft-line" });
     for (const [x, y] of b) add("circle", { cx: x, cy: -y, r: 3 / k, class: "draft-pt" });
   }
 }
-async function applyChemin() {
-  const id = $("c-id").value.trim(), branches = chemin.branches.filter((b) => b.length >= 2);
-  const res = await fetch("/carve", {
-    method: "POST",
-    body: JSON.stringify({ garden: fc, branches, width: Number($("c-width").value), id }),
-  }).catch(() => null);
+/** POSTs to tools/serve.py; returns its answer, or null after showing the error. */
+async function post(path, body) {
+  const res = await fetch(path, { method: "POST", body: JSON.stringify({ garden: fc, ...body }) }).catch(() => null);
   const out = await res?.json().catch(() => null);
-  if (!res?.ok) return status(out?.error ?? `Chemin failed: ${res?.status ?? "no answer"} (is tools/serve.py running?)`);
+  if (res?.ok) return out;
+  status(out?.error ?? `Failed: ${res?.status ?? "no answer"} (is uv run tools/serve.py running?)`);
+  return null;
+}
+function applyResult(out, selectId) {
   snapshot();
   fc = out.garden;
-  selected = fc.features.find((f) => f.properties.id === id);
-  stopChemin(); markDirty(); render();
-  $("c-report").replaceChildren(...out.report.map((line) => Object.assign(document.createElement("div"), { textContent: line })));
-  status(`Carved ${id}: check it, then Save.`);
+  selected = fc.features.find((f) => f.properties.id === selectId) ?? null;
+  markDirty(); render();
+  $("report").replaceChildren(...out.report.map((line) => Object.assign(document.createElement("div"), { textContent: line })));
 }
-$("c-draw").onclick = startChemin;
-$("c-cancel").onclick = stopChemin;
-$("c-apply").onclick = applyChemin;
+async function applyDraw() {
+  const branches = draw.branches.filter((b) => b.length >= 2);
+  if (draw.mode === "chemin") {
+    const id = $("c-id").value.trim();
+    const out = await post("/carve", { branches, width: Number($("c-width").value), id });
+    if (!out) return;
+    stopDraw(); applyResult(out, id);
+    status(`Carved ${id}: check it, then Save.`);
+  } else {
+    const id = selected.properties.id;
+    const out = await post("/split", { id, branches });
+    if (!out) return;
+    stopDraw(); applyResult(out, id);
+    startNaming(out.pieces);
+  }
+}
+$("c-draw").onclick = () => {
+  const z = selected?.properties;
+  if (!$("c-id").value.trim()) $("c-id").value = z?.kind === "zone" ? `chemin_${z.id[0]}` : "chemin";
+  startDraw("chemin");
+};
+$("z-split").onclick = () => startDraw("split");
+$("draw-cancel").onclick = stopDraw;
+$("draw-apply").onclick = applyDraw;
 $("c-width").addEventListener("input", renderDraft);
+
+// ---- naming the pieces of a split: every piece gets an ID typed by the user --------------
+// Pieces arrive as <id>, <id>~1, <id>~2… (largest first); "~" can't be saved (see save).
+const ID_RE = /^[A-Za-z0-9_]{1,20}$/;             // what the Firestore rules accept as a watering's zone
+let naming = null;                                // {ids: current ids of the pieces, i: piece being named}
+function idProblem(v, self) {
+  if (!ID_RE.test(v)) return `ID "${v}": use 1-20 letters, digits or _ (the app can't log waterings otherwise).`;
+  if (fc.features.some((f) => f !== self && f.properties.id === v)) return `ID "${v}" is already used.`;
+  return null;
+}
+function startNaming(ids) { naming = { ids, i: 0 }; showPiece(); }
+function showPiece() {
+  const { ids, i } = naming, f = fc.features.find((f) => f.properties.id === ids[i]);
+  select(f); centerOn(f);
+  $("naming").hidden = false;
+  $("n-help").innerHTML = `Split done. <b>Piece ${i + 1} of ${ids.length}</b> (highlighted, ${Math.round(area(f))} m²): what is its ID?`;
+  $("n-id").value = ids[i].includes("~") ? "" : ids[i];   // the largest piece is pre-filled with the old ID
+  $("n-id").focus();
+}
+function namePiece() {
+  const f = fc.features.find((f) => f.properties.id === naming.ids[naming.i]), v = $("n-id").value.trim();
+  const problem = idProblem(v, f);
+  if (problem) return status(problem);
+  f.properties.id = v; naming.ids[naming.i] = v; markDirty();
+  if (++naming.i < naming.ids.length) return showPiece();
+  status(`Split into ${naming.ids.join(", ")}: check them, then Save.`);
+  stopNaming(); render();
+}
+function stopNaming() { naming = null; $("naming").hidden = true; }
+$("n-ok").onclick = namePiece;
+$("n-id").addEventListener("keydown", (e) => { if (e.key === "Enter") namePiece(); });
+
+// ---- merge: the selected zone absorbs the next one clicked --------------------------------
+let merging = false;
+function stopMerge() { merging = false; svg.classList.remove("merging"); }
+$("z-merge").onclick = () => {
+  merging = true; svg.classList.add("merging");
+  status(`Click the zone to merge into ${selected.properties.id} (Esc cancels).`);
+};
+async function mergeWith(f) {
+  const keep = selected.properties.id, other = f.properties.id;
+  stopMerge();
+  const out = await post("/merge", { keep, other });
+  if (!out) return;
+  applyResult(out, keep);
+  status(`Merged ${other} into ${keep}: check it, then Save.`);
+}
 
 // ---- undo / save -----------------------------------------------------------------------
 function snapshot() {
@@ -410,15 +514,17 @@ function snapshot() {
   if (undo.length > 100) undo.shift();
 }
 window.addEventListener("keydown", (e) => {
-  if (chemin && document.activeElement.tagName !== "INPUT") {
+  if (draw && document.activeElement.tagName !== "INPUT") {
     if (e.key === "Enter") return endBranch();
     if (e.key === "Backspace") { e.preventDefault(); return removePoint(); }
-    if (e.key === "Escape") return stopChemin();
+    if (e.key === "Escape") return stopDraw();
   }
+  if (merging && e.key === "Escape") { stopMerge(); return status(""); }
   if ((e.ctrlKey || e.metaKey) && e.key === "z" && undo.length && document.activeElement.tagName !== "INPUT") {
     e.preventDefault();
     const s = undo.pop();
     fc = JSON.parse(s.json); selected = s.sel == null ? null : fc.features[s.sel]; picked = new Set();
+    stopNaming();
     markDirty(); render();
   }
   if ((e.key === "Delete" || e.key === "Backspace") && picked.size && document.activeElement.tagName !== "INPUT") { e.preventDefault(); deleteVertices(picked); }
@@ -430,6 +536,8 @@ window.addEventListener("keydown", (e) => {
 function markDirty() { dirty = true; $("save").className = "dirty"; }
 function status(msg) { $("status").textContent = msg; }
 $("save").onclick = async () => {
+  const unnamed = fc.features.filter((f) => f.properties.id.includes("~")).map((f) => f.properties.id);
+  if (unnamed.length) return status(`Give the new zones an ID first (${unnamed.join(", ")}): select each and fill in its ID.`);
   const res = await fetch("../data/garden.json", { method: "PUT", body: JSON.stringify(fc) });
   if (!res.ok) return status(`Save failed: ${res.status} (is tools/serve.py running?)`);
   dirty = false; renderPanel(); status(`Saved ${new Date().toLocaleTimeString()}`);

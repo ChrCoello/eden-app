@@ -3,11 +3,13 @@
 # ///
 """Sanity-check data/garden.json and render it over the scan.
 
-Checks: valid geometries, every seeded zone present exactly once, no overlaps, no holes.
+Checks: valid geometries, ids unique and accepted by the Firestore rules,
+no overlaps, no holes.
 Run: uv run tools/check_garden.py [overlay.png]
 """
 import itertools
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -27,7 +29,10 @@ ids = [f["properties"]["id"] for f in fc["features"]]
 problems = []
 problems += [f"invalid geometry: {k}" for k, g in geoms.items() if not g.is_valid]
 problems += [f"duplicate id: {k}" for k in {i for i in ids if ids.count(i) > 1}]
-problems += [f"missing: {k}" for k in [*seeds["zones"], *seeds["lawns"]] if k not in geoms]
+# the Firestore rules only accept waterings whose zone matches this (app/firestore.rules)
+problems += [f'id "{k}" must be 1-20 letters, digits or _' for k in ids if not re.fullmatch(r"[A-Za-z0-9_]{1,20}", k)]
+# zones can be split, merged and renamed in the editor, so a seed without its zone is only a note
+gone = [k for k in [*seeds["zones"], *seeds["lawns"]] if k not in geoms]
 for f in fc["features"]:
     props = f["properties"]
     if props["kind"] != "zone":
@@ -50,6 +55,8 @@ problems += [f"hole of {h.area:.2f} m2 near ({h.centroid.x:.0f}, {h.centroid.y:.
 zones = [g for f, g in zip(fc["features"], geoms.values()) if f["properties"]["kind"] == "zone"]
 print(f"{len(zones)} zones, {len(geoms)} features, garden {union.area:.0f} m2, "
       f"{sum(len(shapely.get_coordinates(g)) for g in geoms.values())} vertices")
+if gone:
+    print(f"note: seeded zones no longer in the file (renamed or merged?): {', '.join(gone)}")
 print("\n".join(problems) or "OK: no problems")
 
 if len(sys.argv) > 1:

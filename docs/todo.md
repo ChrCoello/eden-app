@@ -124,6 +124,23 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
   - [x] Verify: headless editor run on D (draw, apply, undo, errors), `check_garden.py` OK, app on a phone
         viewport (light + dark), 200 randomised carves (jittered lines, widths 1–4 m, adding to a chemin).
   - [ ] (User) Draw and save the real chemins: D first, then the other blocks.
+- [x] 2.11 Split and merge zones in the editor (user request, 2026-09-23; e.g. A1 → 3 zones).
+  - [x] `tools/zones.py`: split(garden, id, lines) cuts a zone/lawn along lines drawn border to border (same
+        snap-rounded arrangement as chemins, so corners stay shared); merge(garden, keep, other) joins two
+        neighbours of the same kind (keep's properties; trees summed when both are counted).
+  - [x] `tools/serve.py`: POST /split, /merge.
+  - [x] Editor: "Split this zone" (draw lines, Apply) then name every piece in a free-text ID field (largest
+        piece pre-filled with the old ID); "Merge with…" then click the neighbour. Save refused while a piece
+        is unnamed.
+  - [x] IDs must match the Firestore rules (`^[A-Za-z0-9_]{1,20}$`), else waterings are refused: checked in
+        the editor (also the existing ID field) and in `check_garden.py`.
+  - [x] Verify: 150 randomised splits of every zone + merge back (valid, no overlaps/holes/T-junctions; area
+        back within 0.15 m², the cm-grid snapping), headless editor flow (split A1 in 3, naming with invalid and
+        duplicate IDs, Save refused while unnamed, merge, Esc, undo), `check_garden.py`.
+        `check_garden.py`: a seeded zone missing is now only a note (zones can be renamed/merged).
+        Editor labels: an L-shaped piece's centroid can fall outside it; the label then goes to the middle
+        of the widest inside stretch.
+  - [ ] (User) Split A1 into its 3 zones and name them.
 
 ### Later (not in the first version)
 

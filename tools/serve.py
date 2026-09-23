@@ -1,10 +1,10 @@
 # /// script
-# dependencies = ["shapely", "numpy"]
+# dependencies = ["shapely"]
 # ///
-"""Serve the repo for tools/editor.html, let it save data/garden.json and carve chemins.
+"""Serve the repo for tools/editor.html, let it save data/garden.json, carve chemins, split and merge zones.
 
 Run: uv run tools/serve.py   then open http://localhost:8000/tools/editor.html
-(python3 tools/serve.py works too, without the chemin tool, which needs shapely.)
+(python3 tools/serve.py works too, without the chemin/split/merge tools, which need shapely.)
 """
 import http.server
 import json
@@ -36,21 +36,27 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        """/carve: {garden, branches, width, id} → {garden, report}, or 400 {error}."""
-        if self.path != "/carve":
-            return self.send_error(404)
+        """Geometry edits, each {garden, ...} → {garden, report, ...}, or 400/500 {error}:
+        /carve {branches, width, id}, /split {id, branches} (+ pieces), /merge {keep, other}."""
         try:
             from chemin import carve
+            from zones import merge, split
         except ImportError:
-            return self.reply(501, {"error": "The chemin tool needs shapely: start the server with uv run tools/serve.py"})
+            return self.reply(501, {"error": "This tool needs shapely: start the server with uv run tools/serve.py"})
+        routes = {
+            "/carve": lambda r: dict(zip(["garden", "report"], carve(r["garden"], r["branches"], float(r["width"]), r["id"]))),
+            "/split": lambda r: dict(zip(["garden", "report", "pieces"], split(r["garden"], r["id"], r["branches"]))),
+            "/merge": lambda r: dict(zip(["garden", "report"], merge(r["garden"], r["keep"], r["other"]))),
+        }
+        if self.path not in routes:
+            return self.send_error(404)
         try:
-            req = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
-            garden, report = carve(req["garden"], req["branches"], float(req["width"]), req["id"])
+            out = routes[self.path](json.loads(self.rfile.read(int(self.headers["Content-Length"]))))
         except (ValueError, KeyError, TypeError) as e:
             return self.reply(400, {"error": str(e)})
         except Exception as e:                                   # a geometry error: keep the server up
-            return self.reply(500, {"error": f"Carving failed ({e}): try a slightly different line."})
-        self.reply(200, {"garden": garden, "report": report})
+            return self.reply(500, {"error": f"Failed ({e}): try a slightly different line."})
+        self.reply(200, out)
 
     def reply(self, code, obj):
         body = json.dumps(obj).encode()

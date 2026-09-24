@@ -47,7 +47,11 @@ export function createMap(svg, garden, scan, onSelect) {
   for (const f of garden.features) {
     const { id, kind } = f.properties;
     const shape = el("path", { d: svgPath(f.geometry), "fill-rule": "evenodd", class: `shape ${kind}` }, shapes);
-    if (kind === "path" || kind === "chemin") continue;     // not tappable, no label
+    if (kind === "house") {                                  // not tappable; a fixed label
+      const [x, y] = labelPoint(f.geometry);
+      el("text", { x, y, class: "label house" }, labels).textContent = f.properties.name || "Maison";
+    }
+    if (kind === "path" || kind === "chemin" || kind === "house") continue;     // not tappable
     shape.dataset.id = id;
     const [x, y] = labelPoint(f.geometry);
     if (kind === "zone") labelById.set(id, el("text", { x, y, class: "label" }, labels));

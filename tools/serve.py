@@ -1,7 +1,7 @@
 # /// script
 # dependencies = ["shapely"]
 # ///
-"""Serve the repo for tools/editor.html, let it save data/garden.json, carve chemins, split and merge zones.
+"""Serve the repo for tools/editor.html, let it save data/garden.json, carve chemins, split and merge zones, add a house.
 
 Run: uv run tools/serve.py   then open http://localhost:8000/tools/editor.html
 (python3 tools/serve.py works too, without the chemin/split/merge tools, which need shapely.)
@@ -37,9 +37,10 @@ class Handler(http.server.SimpleHTTPRequestHandler):
 
     def do_POST(self):
         """Geometry edits, each {garden, ...} → {garden, report, ...}, or 400/500 {error}:
-        /carve {branches, width, id}, /split {id, branches} (+ pieces), /merge {keep, other}."""
+        /carve {branches, width, id}, /split {id, branches} (+ pieces), /merge {keep, other}, /house {outlines, id}."""
         try:
             from chemin import carve
+            from house import add_house
             from zones import merge, split
         except ImportError:
             return self.reply(501, {"error": "This tool needs shapely: start the server with uv run tools/serve.py"})
@@ -47,6 +48,7 @@ class Handler(http.server.SimpleHTTPRequestHandler):
             "/carve": lambda r: dict(zip(["garden", "report"], carve(r["garden"], r["branches"], float(r["width"]), r["id"]))),
             "/split": lambda r: dict(zip(["garden", "report", "pieces"], split(r["garden"], r["id"], r["branches"]))),
             "/merge": lambda r: dict(zip(["garden", "report"], merge(r["garden"], r["keep"], r["other"]))),
+            "/house": lambda r: dict(zip(["garden", "report"], add_house(r["garden"], r["outlines"], r["id"]))),
         }
         if self.path not in routes:
             return self.send_error(404)

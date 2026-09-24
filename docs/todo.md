@@ -162,6 +162,26 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
         viewport, light + dark (3 drawn, empty name → no text, constant size under zoom, tap → zone below).
   - [ ] (User) Place and name the real robinets in the editor, Save, commit.
 
+- [x] 2.13 House (user request, 2026-09-24): a drawn outline (user's choice over an icon), cut out of whatever it
+      covers (user's choice over drawing on top), so zone areas no longer count it.
+  - [x] `tools/chemin.py`: carve's arrangement step factored into `cut_out(fc, area, id, kind, cut, whole)`; carve =
+        band + cut_out, byte-identical to before on 150 random chemins. `tools/house.py`: outline(s) → polygon(s),
+        cut out of zones, lawns, chemins and paths; the whole outline becomes the house (also where no feature
+        was). A house leaves what's left of a zone to that zone (a chemin's small leftovers join a neighbour:
+        for a house that silently grew D4 by 57 m²). New kind `house`; same id again adds a building.
+  - [x] `tools/serve.py`: POST /house {outlines, id}.
+  - [x] Editor: "House" panel: ID (default `maison`) + "Draw a house": click the corners, Enter/double-click closes
+        an outline (filled preview), Apply / Cancel; kind `house` in the Kind list, its own colour.
+  - [x] App: kind `house`: slate fill (#8d96a3 / dark #6e7784, CIEDE2000 ≥ 16 from every map colour), darker
+        outline, not tappable, italic label = its name or "Maison".
+  - [x] Verify: house inside C4 / across D3, a path, chemin_D and E1 / in empty ground / 2nd building, 5 refusals,
+        100 random houses: all valid, no new overlaps, the house = the outline, others lose exactly what it
+        covers, nothing grows (only sub-cm slivers closed by the 1 cm snapping). Headless editor 16/16, app on a
+        phone viewport light + dark, vitest 75/75.
+  - [x] Found on the way: F6 had a 1 cm bow-tie (G5's corner 1 cm from the paths corner at 260.84, −78) that made
+        every shapely tool (chemin, split, merge, house) crash on the whole file. Snapped G5's corner onto it.
+  - [ ] (User) Draw the real house in the editor, Save.
+
 ### Later (not in the first version)
 
 - Multi-select: tick several zones, then "Watered all".

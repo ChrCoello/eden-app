@@ -10,6 +10,8 @@
   --lawn: #d6e9c6;
   --path: #faf8f2;   /* gravel: recessive, not data */
   --chemin: #c6ab84; /* grass walkway between beds: ΔE ≥ 16 from every zone colour, grey and blue */
+  --house: #8d96a3;  /* buildings: a slate darker than the "jamais" grey, greyer than the automatic blue */
+  --house-edge: #4a525c;
   --selected: var(--ink);   /* visible on every fill: orange, grey and the automatic blue */
   /* days since watering, user's scale: green (0–4 j) → light green → yellow → light orange →
      dark orange → red (9 j +). Adjacent steps can't all be told apart with red–green colour
@@ -41,6 +43,8 @@
     --lawn: #2a3d2d;
     --path: #2c332e;
     --chemin: #6b5a3f;
+    --house: #6e7784;
+    --house-edge: #a3acb8;
     --dry-0: #3a8a42;
     --dry-1: #86c24a;
     --dry-2: #e0b81f;
@@ -109,6 +113,7 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
 .shape.lawn { fill: var(--lawn); stroke: var(--zone-edge); stroke-width: 1.5; }
 .shape.path { fill: var(--path); pointer-events: none; }
 .shape.chemin { fill: var(--chemin); stroke: var(--zone-edge); stroke-width: 1.5; pointer-events: none; }
+.shape.house { fill: var(--house); stroke: var(--house-edge); stroke-width: 1.5; pointer-events: none; }
 .scan.visible ~ g .shape.zone, .scan.visible ~ g .shape.lawn, .scan.visible ~ g .shape.chemin { fill-opacity: 0.45; }
 .shape[data-dry="0"], #legend [data-dry="0"] { fill: var(--dry-0); background: var(--dry-0); }
 .shape[data-dry="1"], #legend [data-dry="1"] { fill: var(--dry-1); background: var(--dry-1); }
@@ -130,6 +135,7 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
   pointer-events: none;
 }
 .label .note { font-size: 0.85em; font-weight: 600; }
+.label.house { font-weight: 600; font-style: italic; }
 .robinet { cursor: pointer; }
 .robinet .hit { fill: transparent; }
 .robinet circle:not(.hit) { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }

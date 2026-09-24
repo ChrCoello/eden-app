@@ -31,6 +31,8 @@
   .handle.shared { fill: var(--accent); }
   .handle.picked { fill: #e00; }
   .cell.chemin { fill: rgba(215, 160, 80, .45); stroke: #a0662a; }
+  .cell.house { fill: rgba(80, 90, 105, .5); stroke: #2b3440; }
+  .draft-house { fill: rgba(80, 90, 105, .35); stroke: #2b3440; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
   .draft-band { fill: none; stroke: rgba(215, 130, 30, .45); stroke-linejoin: round; stroke-linecap: butt; pointer-events: none; }
   .draft-line { fill: none; stroke: #8a4b00; stroke-width: 1.5; vector-effect: non-scaling-stroke; pointer-events: none; }
   .draft-pt { fill: #8a4b00; pointer-events: none; }
@@ -69,7 +71,7 @@
   <div id="selected">
     <label>ID</label><input id="f-id">
     <label>Kind</label>
-    <select id="f-kind"><option>zone</option><option>lawn</option><option>path</option><option>chemin</option></select>
+    <select id="f-kind"><option>zone</option><option>lawn</option><option>path</option><option>chemin</option><option>house</option></select>
     <label>Name</label><input id="f-name" placeholder="e.g. Section Acer">
     <div id="zone-only">
       <label><input id="f-auto" type="checkbox" style="width:auto"> Automatic watering (no manual logging)</label>
@@ -88,6 +90,10 @@
     <div><label>Width (m)</label><input id="c-width" type="number" min="0.3" max="10" step="0.1" value="2.5"></div>
   </div>
   <button id="c-draw">Draw a chemin</button>
+
+  <h2>House</h2>
+  <label>ID</label><input id="h-id" value="maison" autocomplete="off">
+  <button id="h-draw">Draw a house</button>
 
   <h2>Robinets</h2>
   <button id="r-add">Add a robinet</button>
@@ -116,6 +122,8 @@
     Needs <code>uv run tools/serve.py</code>. Drawing again with the same ID adds to it<br>
     <b>Split a zone</b> select it, "Split this zone", draw lines across it, Apply, then give each piece an ID<br>
     <b>Merge zones</b> select one, "Merge with…", click its neighbour: the first keeps its ID and settings<br>
+    <b>House</b> "Draw a house", click its corners in order; Apply cuts it out of whatever it covers.
+    Needs <code>uv run tools/serve.py</code>. Drawing again with the same ID adds a building<br>
     <b>Robinet</b> (water tap) "Add a robinet", click where it is, type its name. Drag it to move it;
     select it, then Delete to remove it<br>
     <b>Undo</b> Ctrl+Z<br>
@@ -459,11 +467,13 @@ let draw = null;                                  // {mode: "chemin"|"split", br
 const HELP = {
   chemin: `Click along the <b>middle</b> of the chemin, and end each line on the gravel path.`,
   split: `Click a line <b>across</b> the zone, from border to border (a bit past is fine). Two lines make 3 zones.`,
+  house: `Click the house's <b>corners</b> in order around it. The outline closes by itself; draw another one for a second building.`,
 };
 function startDraw(mode) {
   stopMerge(); stopAdding();
   draw = { mode, branches: [[]] };
-  $("draw-help").innerHTML = HELP[mode] + ` <b>Enter</b> or double-click ends a line; start the next one anywhere.
+  const ends = mode === "house" ? "closes the outline" : "ends a line";
+  $("draw-help").innerHTML = HELP[mode] + ` <b>Enter</b> or double-click ${ends}; start the next one anywhere.
     <b>Backspace</b> removes the last point, <b>Esc</b> cancels.`;
   $("draw-tools").hidden = false; svg.classList.add("drawing");
   status(""); renderDraft(); renderPanel();
@@ -493,7 +503,8 @@ function renderDraft() {
   for (const b of draw.branches) {
     const points = b.map(([x, y]) => `${x},${-y}`).join(" ");
     if (draw.mode === "chemin") add("polyline", { points, class: "draft-band", "stroke-width": Number($("c-width").value) || 0 });   // meters
-    add("polyline", { points, class: "draft-line" });
+    if (draw.mode === "house") add("polygon", { points, class: "draft-house" });
+    else add("polyline", { points, class: "draft-line" });
     for (const [x, y] of b) add("circle", { cx: x, cy: -y, r: 3 / k, class: "draft-pt" });
   }
 }
@@ -515,7 +526,13 @@ function applyResult(out, selectId) {
 }
 async function applyDraw() {
   const branches = draw.branches.filter((b) => b.length >= 2);
-  if (draw.mode === "chemin") {
+  if (draw.mode === "house") {
+    const id = $("h-id").value.trim();
+    const out = await post("/house", { outlines: draw.branches.filter((b) => b.length >= 3), id });
+    if (!out) return;
+    stopDraw(); applyResult(out, id);
+    status(`Added ${id}: check it, then Save.`);
+  } else if (draw.mode === "chemin") {
     const id = $("c-id").value.trim();
     const out = await post("/carve", { branches, width: Number($("c-width").value), id });
     if (!out) return;
@@ -535,6 +552,7 @@ $("c-draw").onclick = () => {
   startDraw("chemin");
 };
 $("z-split").onclick = () => startDraw("split");
+$("h-draw").onclick = () => startDraw("house");
 $("draw-cancel").onclick = stopDraw;
 $("draw-apply").onclick = applyDraw;
 $("c-width").addEventListener("input", renderDraft);

@@ -25,17 +25,22 @@ export function createMap(svg, garden, scan, onSelect) {
   const view = el("g", {}, svg);
   const scanImg = el("image", { href: scan.url, width: scan.width, height: scan.height, class: "scan" }, view);
   const shapes = el("g", {}, view);
-  // Robinets (water taps): drawn in screen pixels, so each is scaled by 1 / k in apply(). Display only,
-  // under the zone labels (which carry the day counts).
-  const taps = el("g", { class: "robinets" }, view);
-  const robinets = (garden.robinets ?? []).map(({ name, at: [x, y] }) => {
-    const g = el("g", { class: "robinet" }, taps);
+  // Robinets (water taps): an icon drawn in screen pixels, so each is scaled by 1 / k in apply(); under the
+  // zone labels (which carry the day counts). A tap shows the name in a bubble, drawn above everything.
+  const taps = el("g", {}, view);
+  const robinets = (garden.robinets ?? []).map(({ at: [x, y] }, i) => {
+    const g = el("g", { class: "robinet", "data-robinet": i }, taps);
+    el("circle", { r: 18, class: "hit" }, g);        // a finger-sized target around the 22 px icon
     el("circle", { r: 11 }, g);
     el("path", { d: TAP, "fill-rule": "evenodd", transform: "scale(0.72) translate(-12 -12)" }, g);
-    if (name) el("text", { y: -16 }, g).textContent = name;
     return [g, x, -y];
   });
   const labels = el("g", { class: "labels" }, view);
+  const bubble = el("g", { class: "robinet-bubble", display: "none" }, view);
+  const bubbleBox = el("rect", { y: -52, height: 30, rx: 8 }, bubble);
+  el("path", { d: "M-6 -22.5L0 -15L6 -22.5Z" }, bubble);   // the pointer, down to the icon
+  const bubbleText = el("text", { y: -37 }, bubble);
+  let openRobinet = null;
 
   const byId = new Map();
   const labelById = new Map();
@@ -60,6 +65,7 @@ export function createMap(svg, garden, scan, onSelect) {
     labels.style.fontSize = `${LABEL_PX / k}px`;
     labels.style.strokeWidth = `${3 / k}px`;    // halo around labels, constant on screen too
     for (const [g, x, y] of robinets) g.setAttribute("transform", `translate(${x} ${y}) scale(${1 / k})`);
+    if (openRobinet != null) bubble.setAttribute("transform", robinets[openRobinet][0].getAttribute("transform"));
   }
   function fit(b = home, pad = 12) {
     const { width, height } = svg.getBoundingClientRect();
@@ -94,7 +100,7 @@ export function createMap(svg, garden, scan, onSelect) {
     pointers.set(e.pointerId, local(e));
     if (pointers.size === 1) {
       const [x, y] = local(e);
-      gesture = { startX: x, startY: y, target: e.target.closest("[data-id]"), multi: false };
+      gesture = { startX: x, startY: y, target: e.target.closest("[data-id], [data-robinet]"), multi: false };
     } else if (gesture) {
       gesture.multi = true;
     }
@@ -120,7 +126,11 @@ export function createMap(svg, garden, scan, onSelect) {
     if (!pointers.delete(e.pointerId) || pointers.size || !gesture) return;
     const [x, y] = local(e);
     const tap = !gesture.multi && Math.hypot(x - gesture.startX, y - gesture.startY) < TAP_SLOP;
-    if (tap && e.type === "pointerup") select(gesture.target?.dataset.id ?? null);
+    if (tap && e.type === "pointerup") {
+      const robinet = gesture.target?.dataset.robinet;
+      showRobinet(robinet == null ? null : Number(robinet));
+      if (robinet == null) select(gesture.target?.dataset.id ?? null);   // a robinet leaves the zone sheet as is
+    }
     gesture = null;
   };
   svg.addEventListener("pointerup", release);
@@ -149,6 +159,18 @@ export function createMap(svg, garden, scan, onSelect) {
     if (note) text.append(line(note, { dy: "1.15em", class: "note" }));
   }
   for (const [id, text] of labelById) setLabel(text, id, null);
+
+  /** Shows robinet i's name in the bubble above it, or hides the bubble (null). */
+  function showRobinet(i) {
+    openRobinet = i;
+    bubble.setAttribute("display", i == null ? "none" : "inline");
+    if (i == null) return;
+    bubbleText.textContent = garden.robinets[i].name || "Robinet";
+    const w = bubbleText.getComputedTextLength() + 24;
+    bubbleBox.setAttribute("x", -w / 2);
+    bubbleBox.setAttribute("width", w);
+    apply();
+  }
 
   // ---- selection -----------------------------------------------------------------------
   let selected = null;

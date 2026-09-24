@@ -151,8 +151,10 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
   - [x] Editor: "Robinets" panel: "Add a robinet" then click the map (pre-named "Robinet N", name field focused);
         drag the marker to move it; click it (or its button in the list) to select → rename, Delete key or button;
         undo and Save as usual. A half-typed name is committed before a click changes the selection.
-  - [x] App: white disc with a blue tap icon (user's choice, traced from `data/751924.png` to an SVG path) + name, constant size on screen, `pointer-events: none` (taps go
-        to the zone underneath), drawn under the zone labels so the day counts stay readable. Light + dark.
+  - [x] App: white disc with a blue tap icon (user's choice, traced from `data/751924.png` to an SVG path), no
+        name on the map (user, 2026-09-24): a tap shows the name in a small bubble above the icon (drawn above the
+        labels, follows pan/zoom); a tap anywhere else closes it. A tapped robinet leaves the zone sheet as is.
+        Constant size on screen, 36 px finger target, under the zone labels. Light + dark.
   - [x] `check_garden.py`: each robinet has a text name and 2 finite coordinates; drawn on the overlay.
   - [x] Verify: vitest 75/75 (robinets well-formed); headless editor on a scratch copy, 27/27 (add, focus, no zone
         selected by the placing click, rename, drag, half-typed name, plain click = no undo step, Delete, Ctrl+Z,

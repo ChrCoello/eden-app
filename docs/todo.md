@@ -143,6 +143,22 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
         Editor labels: an L-shaped piece's centroid can fall outside it; the label then goes to the middle
         of the widest inside stretch.
   - [ ] (User) Split A1 into its 3 zones and name them.
+- [x] 2.12 Robinets (user request, 2026-09-24): water taps at single points, free-text name, shown on the map only
+      (no sheet, no watering, not tappable).
+  - [x] Storage: a `robinets` list next to `features` in `garden.json`: `[{"name": "…", "at": [x, y]}]` (meters).
+        Not Point features: every geometry tool (editor rings, chemin/split/merge, check_garden overlaps, app
+        bounds/labels/tests) assumes polygons; a separate list leaves them untouched (serve.py keeps it: `{**fc}`).
+  - [x] Editor: "Robinets" panel: "Add a robinet" then click the map (pre-named "Robinet N", name field focused);
+        drag the marker to move it; click it (or its button in the list) to select → rename, Delete key or button;
+        undo and Save as usual. A half-typed name is committed before a click changes the selection.
+  - [x] App: white disc with the blue 💧 drop + name, constant size on screen, `pointer-events: none` (taps go
+        to the zone underneath), drawn under the zone labels so the day counts stay readable. Light + dark.
+  - [x] `check_garden.py`: each robinet has a text name and 2 finite coordinates; drawn on the overlay.
+  - [x] Verify: vitest 75/75 (robinets well-formed); headless editor on a scratch copy, 27/27 (add, focus, no zone
+        selected by the placing click, rename, drag, half-typed name, plain click = no undo step, Delete, Ctrl+Z,
+        Esc, list, save keeps features identical, reload); split/merge keep robinets; app on a 390×844 touch
+        viewport, light + dark (3 drawn, empty name → no text, constant size under zoom, tap → zone below).
+  - [ ] (User) Place and name the real robinets in the editor, Save, commit.
 
 ### Later (not in the first version)
 

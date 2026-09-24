@@ -17,9 +17,9 @@
   button { cursor: pointer; margin-top: 6px; }
   #save.dirty { background: var(--accent); font-weight: 600; }
   #status { margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 1em; }
-  #list { display: flex; flex-wrap: wrap; gap: 3px; }
-  #list button { flex: 1 0 48px; width: auto; margin: 0; padding: 3px 4px; font-size: 12px; }
-  #list button.sel { outline: 2px solid var(--accent); }
+  #list, #r-list { display: flex; flex-wrap: wrap; gap: 3px; }
+  #list button, #r-list button { flex: 1 0 48px; width: auto; margin: 0; padding: 3px 4px; font-size: 12px; }
+  #list button.sel, #r-list button.sel { outline: 2px solid var(--accent); }
   .help { font-size: 12px; color: var(--muted); line-height: 1.5; }
   .help b { color: var(--ink); }
   .cell { vector-effect: non-scaling-stroke; stroke: #c00; stroke-width: 1.2; cursor: pointer; }
@@ -39,11 +39,17 @@
   .tool { margin: 8px 0; padding: 8px; border: 2px solid var(--accent); border-radius: 6px; background: #fff; }
   #report:not(:empty) { margin-top: 6px; }
   .row { display: flex; gap: 6px; } .row > div { flex: 1; min-width: 0; }
+  .rob { cursor: move; }                           /* robinets are drawn in screen px (scaled by 1 / k) */
+  .rob circle { fill: #fff; stroke: #1f5fbf; stroke-width: 2; }
+  .rob .dot { fill: #2f7fd1; stroke: none; }
+  .rob.sel circle:first-child { stroke: var(--accent); stroke-width: 3; }
+  .rob text { font-weight: 700; font-size: 13px; fill: #1f5fbf; paint-order: stroke; stroke: #fff; stroke-width: 3; text-anchor: middle; pointer-events: none; }
+  #map.adding { cursor: crosshair; }
   .box { fill: rgba(230, 0, 0, .08); stroke: #e00; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 </style>
 </head>
 <body>
-<svg id="map"><g id="view"><image id="scan" href="../data/map.jpg"/><g id="cells"></g><g id="labels"></g><g id="handles"></g><g id="draft"></g></g></svg>
+<svg id="map"><g id="view"><image id="scan" href="../data/map.jpg"/><g id="cells"></g><g id="labels"></g><g id="robinets"></g><g id="handles"></g><g id="draft"></g></g></svg>
 <aside>
   <h1>Garden zone editor</h1>
   <button id="save">Save</button>
@@ -83,6 +89,14 @@
   </div>
   <button id="c-draw">Draw a chemin</button>
 
+  <h2>Robinets</h2>
+  <button id="r-add">Add a robinet</button>
+  <div id="robinet" hidden>
+    <label>Name</label><input id="r-name" placeholder="e.g. Robinet serre" autocomplete="off">
+    <button id="r-delete">Delete this robinet</button>
+  </div>
+  <div id="r-list"></div>
+
   <h2>View</h2>
   <label>Scan opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.8">
   <label><input id="show-labels" type="checkbox" checked style="width:auto"> labels</label>
@@ -102,6 +116,8 @@
     Needs <code>uv run tools/serve.py</code>. Drawing again with the same ID adds to it<br>
     <b>Split a zone</b> select it, "Split this zone", draw lines across it, Apply, then give each piece an ID<br>
     <b>Merge zones</b> select one, "Merge with…", click its neighbour: the first keeps its ID and settings<br>
+    <b>Robinet</b> (water tap) "Add a robinet", click where it is, type its name. Drag it to move it;
+    select it, then Delete to remove it<br>
     <b>Undo</b> Ctrl+Z<br>
     Big mistakes: move the seed in <code>data/zone_seeds.json</code> and re-run
     <code>uv run tools/segment_zones.py</code> instead.
@@ -113,6 +129,7 @@ const svg = $("map"), view = $("view");
 const NS = "http://www.w3.org/2000/svg";
 let fc, px_per_m, selected = null, dirty = false, undo = [];
 let picked = new Set();                           // keys of corners picked with the box
+let selRob = null, adding = false;                // selected robinet ({name, at}); placing a new one
 let k = 1, tx = 0, ty = 0;                        // screen px per meter, pan offset
 let scanW, scanH;                                 // scan size in meters
 
@@ -184,7 +201,7 @@ function render() {
     }
   }
   if (selected) cells.append(cells.querySelector(".sel"));     // selected on top
-  renderHandles(); renderList(); renderPanel(); applyView();
+  renderRobinets(); renderHandles(); renderList(); renderPanel(); applyView();
 }
 function renderHandles() {
   const g = $("handles");
@@ -212,6 +229,27 @@ function renderList() {
     return b;
   }));
 }
+function renderRobinets() {
+  $("robinets").replaceChildren(...fc.robinets.map((r) => {
+    const g = document.createElementNS(NS, "g"), add = (name, attrs) => {
+      const n = document.createElementNS(NS, name);
+      for (const a in attrs) n.setAttribute(a, attrs[a]);
+      return g.appendChild(n);
+    };
+    g.setAttribute("class", "rob" + (r === selRob ? " sel" : ""));
+    g.__r = r;
+    add("circle", { r: 7 }); add("circle", { r: 3, class: "dot" });
+    add("text", { y: -11 }).textContent = r.name;
+    return g;
+  }));
+  $("r-list").replaceChildren(...fc.robinets.map((r) => {
+    const b = document.createElement("button");
+    b.textContent = r.name || "(no name)";
+    if (r === selRob) b.className = "sel";
+    b.onclick = () => { selectRobinet(r); centerAt(r.at); };
+    return b;
+  }));
+}
 function renderPanel() {
   const p = selected?.properties;
   for (const [id, field] of [["f-id", "id"], ["f-kind", "kind"], ["f-name", "name"]]) {
@@ -224,6 +262,9 @@ function renderPanel() {
   $("f-trees").value = isZone && p.trees != null ? p.trees : "";
   $("z-split").disabled = draw || !["zone", "lawn"].includes(p?.kind);
   $("z-merge").disabled = draw || !["zone", "lawn", "chemin"].includes(p?.kind);
+  $("robinet").hidden = !selRob;
+  $("r-name").value = selRob?.name ?? "";
+  $("r-add").className = adding ? "dirty" : "";
   $("save").className = dirty ? "dirty" : "";
 }
 function hash(s) { let h = 0; for (const c of s) h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h) * 47; }
@@ -236,6 +277,7 @@ function applyView() {
   $("labels").style.display = $("show-labels").checked ? "" : "none";
   for (const c of $("handles").children) c.setAttribute("r", 5 / k);
   for (const c of $("draft").querySelectorAll("circle")) c.setAttribute("r", 3 / k);
+  for (const g of $("robinets").children) g.setAttribute("transform", `translate(${g.__r.at[0]} ${-g.__r.at[1]}) scale(${1 / k})`);
 }
 function toWorld(e) {
   const b = svg.getBoundingClientRect();
@@ -245,8 +287,9 @@ function fit() {
   const b = svg.getBoundingClientRect(), [w, h] = [scanW, scanH];
   k = Math.min(b.width / w, b.height / h); tx = (b.width - w * k) / 2; ty = (b.height - h * k) / 2;
 }
-function centerOn(f) {
-  const b = svg.getBoundingClientRect(), [x, y] = labelPoint(f);
+function centerOn(f) { centerAt(labelPoint(f)); }
+function centerAt([x, y]) {
+  const b = svg.getBoundingClientRect();
   tx = b.width / 2 - x * k; ty = b.height / 2 + y * k; applyView();
 }
 svg.addEventListener("wheel", (e) => {
@@ -261,6 +304,13 @@ svg.addEventListener("wheel", (e) => {
 let drag = null, moved = false;
 svg.addEventListener("mousedown", (e) => {
   moved = false;
+  document.activeElement.blur();                  // commit a half-typed name before the selection changes
+  if (adding) {                                   // preventDefault keeps the focus in the new robinet's name;
+    e.preventDefault(); addRobinet(toWorld(e));   // moved: the click that follows mustn't select a zone
+    moved = true; return;
+  }
+  const rob = !draw && e.target.closest(".rob");
+  if (rob) { selectRobinet(rob.__r); snapshot(); drag = { rob: rob.__r }; return; }
   const h = !draw && e.target.closest(".handle");
   if (h && e.shiftKey) return deleteVertices([h.dataset.key]);
   if (e.shiftKey && selected && !draw) {
@@ -278,6 +328,7 @@ window.addEventListener("mousemove", (e) => {
   if (!drag) return;
   moved = true;
   if (drag.pan) { tx = e.clientX - drag.x; ty = e.clientY - drag.y; return applyView(); }
+  if (drag.rob) { drag.rob.at = toWorld(e).map(r2); return applyView(); }
   if (drag.box) {
     const [[x0, y0], [x1, y1]] = [drag.start, toWorld(e)];
     drag.end = [x1, y1];
@@ -293,6 +344,7 @@ window.addEventListener("mousemove", (e) => {
 window.addEventListener("mouseup", (e) => {
   if (draw && drag?.pan && !moved) addPoint(toWorld(e));
   if (drag?.box) { pickInBox(drag.start, drag.end ?? drag.start); drag.box.remove(); }
+  else if (drag?.rob) { if (moved) markDirty(); else undo.pop(); render(); }   // a plain click only selects
   else if (drag && !drag.pan) { markDirty(); render(); }
   drag = null; svg.classList.remove("panning");
 });
@@ -349,7 +401,7 @@ function segDist([px, py], [ax, ay], [bx, by]) {
 function redrawCells() {
   for (const el of $("cells").children) el.setAttribute("d", pathD(el.__f));
 }
-function select(f) { selected = f; picked = new Set(); render(); }
+function select(f) { selected = f; selRob = null; picked = new Set(); render(); }
 
 // panel edits
 $("f-id").addEventListener("change", (e) => {
@@ -376,6 +428,31 @@ $("f-trees").addEventListener("change", (e) => {
 $("opacity").addEventListener("input", (e) => ($("scan").style.opacity = e.target.value));
 $("show-labels").addEventListener("change", applyView);
 
+// ---- robinets: water taps at single points, only shown on the map --------------------------
+function selectRobinet(r) { selected = null; selRob = r; picked = new Set(); render(); }
+function stopAdding() { adding = false; svg.classList.remove("adding"); renderPanel(); }
+function addRobinet(p) {
+  snapshot();
+  const r = { name: `Robinet ${fc.robinets.length + 1}`, at: p.map(r2) };
+  fc.robinets.push(r);
+  stopAdding(); selectRobinet(r); markDirty();
+  $("r-name").focus(); $("r-name").select();
+  status("Robinet added: type its name, then Save.");
+}
+function deleteRobinet() {
+  snapshot();
+  fc.robinets.splice(fc.robinets.indexOf(selRob), 1);
+  status(`Deleted ${selRob.name || "the robinet"}.`);
+  selRob = null; markDirty(); render();
+}
+$("r-add").onclick = () => {
+  if (draw) stopDraw();
+  stopMerge(); adding = true; svg.classList.add("adding"); renderPanel();
+  status("Click where the robinet is (Esc cancels).");
+};
+$("r-name").addEventListener("change", (e) => { snapshot(); selRob.name = e.target.value.trim(); markDirty(); render(); });
+$("r-delete").onclick = deleteRobinet;
+
 // ---- drawing lines: a chemin's middle lines (carved) or the cut lines of a split ---------
 // Geometry is done by tools/serve.py (shapely); the editor only draws and shows the result.
 let draw = null;                                  // {mode: "chemin"|"split", branches: [[x, y]...][]}; last = current
@@ -384,7 +461,7 @@ const HELP = {
   split: `Click a line <b>across</b> the zone, from border to border (a bit past is fine). Two lines make 3 zones.`,
 };
 function startDraw(mode) {
-  stopMerge();
+  stopMerge(); stopAdding();
   draw = { mode, branches: [[]] };
   $("draw-help").innerHTML = HELP[mode] + ` <b>Enter</b> or double-click ends a line; start the next one anywhere.
     <b>Backspace</b> removes the last point, <b>Esc</b> cancels.`;
@@ -432,6 +509,7 @@ function applyResult(out, selectId) {
   snapshot();
   fc = out.garden;
   selected = fc.features.find((f) => f.properties.id === selectId) ?? null;
+  selRob = null;
   markDirty(); render();
   $("report").replaceChildren(...out.report.map((line) => Object.assign(document.createElement("div"), { textContent: line })));
 }
@@ -510,7 +588,7 @@ async function mergeWith(f) {
 
 // ---- undo / save -----------------------------------------------------------------------
 function snapshot() {
-  undo.push({ json: JSON.stringify(fc), sel: selected && fc.features.indexOf(selected) });
+  undo.push({ json: JSON.stringify(fc), sel: selected && fc.features.indexOf(selected), rob: selRob && fc.robinets.indexOf(selRob) });
   if (undo.length > 100) undo.shift();
 }
 window.addEventListener("keydown", (e) => {
@@ -524,12 +602,15 @@ window.addEventListener("keydown", (e) => {
     e.preventDefault();
     const s = undo.pop();
     fc = JSON.parse(s.json); selected = s.sel == null ? null : fc.features[s.sel]; picked = new Set();
+    selRob = s.rob == null ? null : fc.robinets[s.rob];
     stopNaming();
     markDirty(); render();
   }
   if ((e.key === "Delete" || e.key === "Backspace") && picked.size && document.activeElement.tagName !== "INPUT") { e.preventDefault(); deleteVertices(picked); }
+  else if ((e.key === "Delete" || e.key === "Backspace") && selRob && document.activeElement.tagName !== "INPUT") { e.preventDefault(); deleteRobinet(); }
   if (e.key === "Escape") {
-    if (picked.size) { picked = new Set(); status(""); renderHandles(); }
+    if (adding) { stopAdding(); status(""); }
+    else if (picked.size) { picked = new Set(); status(""); renderHandles(); }
     else select(null);
   }
 });
@@ -547,6 +628,7 @@ window.addEventListener("beforeunload", (e) => { if (dirty) e.preventDefault(); 
 // ---- boot ------------------------------------------------------------------------------
 (async () => {
   [fc, { px_per_m }] = await Promise.all(["garden.json", "calibration.json"].map((f) => fetch(`../data/${f}`).then((r) => r.json())));
+  fc.robinets ??= [];                             // [{name, at: [x, y]}], next to the features
   const img = new Image();
   img.src = "../data/map.jpg";
   await img.decode();

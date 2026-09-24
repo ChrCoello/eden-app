@@ -4,11 +4,12 @@
 """Sanity-check data/garden.json and render it over the scan.
 
 Checks: valid geometries, ids unique and accepted by the Firestore rules,
-no overlaps. Gaps between zones are allowed and only listed.
+no overlaps, robinets well-formed. Gaps between zones are allowed and only listed.
 Run: uv run tools/check_garden.py [overlay.png]
 """
 import itertools
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -42,6 +43,14 @@ for f in fc["features"]:
     trees = props.get("trees")
     if trees is not None and not (isinstance(trees, int) and not isinstance(trees, bool) and trees >= 0):
         problems.append(f'{props["id"]}: "trees" must be a whole number >= 0, or null')
+# robinets (water taps): points next to the features, [{"name": str, "at": [x, y]}]
+robinets = fc.get("robinets", [])
+for i, r in enumerate(robinets):
+    at = r.get("at")
+    if not isinstance(r.get("name"), str):
+        problems.append(f"robinet {i + 1}: \"name\" must be text")
+    if not (isinstance(at, list) and len(at) == 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in at)):
+        problems.append(f"robinet {i + 1} ({r.get('name')}): \"at\" must be [x, y] in meters")
 valid = {k: g for k, g in geoms.items() if g.is_valid}   # overlap maths needs valid shapes
 for (ka, a), (kb, b) in itertools.combinations(valid.items(), 2):
     if (area := a.intersection(b).area) > 0.05:
@@ -54,7 +63,7 @@ if (n := len(shapely.get_parts(union))) > 1:
     notes.append(f"the zones form {n} separate pieces")
 
 zones = [g for f, g in zip(fc["features"], geoms.values()) if f["properties"]["kind"] == "zone"]
-print(f"{len(zones)} zones, {len(geoms)} features, garden {union.area:.0f} m2, "
+print(f"{len(zones)} zones, {len(geoms)} features, {len(robinets)} robinets, garden {union.area:.0f} m2, "
       f"{sum(len(shapely.get_coordinates(g)) for g in geoms.values())} vertices")
 for note in notes:
     print(f"note: {note}")
@@ -74,5 +83,9 @@ if len(sys.argv) > 1:
                 draw.line(to_px(ring.coords), fill="blue" if k == "paths" else "red", width=2)
         c = g.representative_point()
         draw.text((c.x * sx * scale - 8, -c.y * sy * scale - 5), k, fill="black")
+    for r in robinets:
+        (px, py), = to_px([r["at"]])
+        draw.ellipse((px - 5, py - 5, px + 5, py + 5), fill="deepskyblue", outline="black")
+        draw.text((px + 7, py - 5), r["name"], fill="navy")
     im.save(sys.argv[1])
 sys.exit(1 if problems else 0)

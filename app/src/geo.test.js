@@ -39,6 +39,15 @@ describe("garden.json", () => {
     for (const id of ids) expect(id).toMatch(/^[A-Za-z0-9_]{1,20}$/);   // app/firestore.rules
   });
 
+  // Robinets (water taps) live next to the features: [{name, at: [x, y]}], shown on the map only.
+  test("robinets have a name and a point in meters", () => {
+    for (const r of garden.robinets ?? []) {
+      expect(typeof r.name).toBe("string");
+      expect(r.at).toHaveLength(2);
+      for (const v of r.at) expect(Number.isFinite(v)).toBe(true);
+    }
+  });
+
   test.each(garden.features.map((f) => [f.properties.id, f]))("label of %s sits inside it", (_, f) => {
     expect(contains(f.geometry, labelPoint(f.geometry))).toBe(true);
   });

@@ -5,6 +5,7 @@ const NS = "http://www.w3.org/2000/svg";
 const TAP_SLOP = 10;        // px a finger may move and still count as a tap
 const LABEL_PX = 13;        // label size on screen, whatever the zoom
 const MAX_PX_PER_M = 60;
+const DROP = "M12 2.5C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 2.5Z";   // same as the 💧 button
 
 function el(name, attrs = {}, parent) {
   const node = document.createElementNS(NS, name);
@@ -23,6 +24,16 @@ export function createMap(svg, garden, scan, onSelect) {
   const view = el("g", {}, svg);
   const scanImg = el("image", { href: scan.url, width: scan.width, height: scan.height, class: "scan" }, view);
   const shapes = el("g", {}, view);
+  // Robinets (water taps): drawn in screen pixels, so each is scaled by 1 / k in apply(). Display only,
+  // under the zone labels (which carry the day counts).
+  const taps = el("g", { class: "robinets" }, view);
+  const robinets = (garden.robinets ?? []).map(({ name, at: [x, y] }) => {
+    const g = el("g", { class: "robinet" }, taps);
+    el("circle", { r: 9 }, g);
+    el("path", { d: DROP, transform: "scale(0.6) translate(-12 -11.75)" }, g);
+    if (name) el("text", { y: -14 }, g).textContent = name;
+    return [g, x, -y];
+  });
   const labels = el("g", { class: "labels" }, view);
 
   const byId = new Map();
@@ -47,6 +58,7 @@ export function createMap(svg, garden, scan, onSelect) {
     view.setAttribute("transform", `translate(${tx} ${ty}) scale(${k})`);
     labels.style.fontSize = `${LABEL_PX / k}px`;
     labels.style.strokeWidth = `${3 / k}px`;    // halo around labels, constant on screen too
+    for (const [g, x, y] of robinets) g.setAttribute("transform", `translate(${x} ${y}) scale(${1 / k})`);
   }
   function fit(b = home, pad = 12) {
     const { width, height } = svg.getBoundingClientRect();

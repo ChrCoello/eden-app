@@ -130,6 +130,19 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
   pointer-events: none;
 }
 .label .note { font-size: 0.85em; font-weight: 600; }
+.robinets { pointer-events: none; }   /* display only: a tap goes to the zone underneath */
+.robinet circle { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }
+.robinet path { fill: var(--water); }
+.robinet text {
+  fill: var(--ink);
+  font-size: 12px;
+  font-weight: 600;
+  text-anchor: middle;
+  paint-order: stroke;
+  stroke: var(--bg);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
 
 #sheet {
   position: fixed;

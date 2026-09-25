@@ -48,15 +48,25 @@ export function describeDay(day, today = isoDay()) {
   return `le ${d} ${MONTHS[m - 1]}${y === Number(today.slice(0, 4)) ? "" : ` ${y}`}`;
 }
 
-/** Dryness level shown on the map (user's scale, 2026-09-22): 0 = watered 0–4 days ago (green),
- *  then one level per day: 1 = 5 days, 2 = 6, 3 = 7, 4 = 8, 5 = 9 days or more (red).
- *  null = no watering on record. */
-const GREEN_DAYS = 4;
-const MAX_LEVEL = 5;
+/** The map's colour scale (user's, 2026-09-25): level i covers days since watering up to
+ *  DRYNESS_UP_TO[i]; the last level covers everything after. Each level's colour is --dry-<i>
+ *  in style.css. The legend is built from this list. */
+export const DRYNESS_UP_TO = [3, 5, 6];   // 0–3 j green, 4–5 j yellow, 6 j orange, 7 j et + red
+
+/** Dryness level shown on the map, 0..DRYNESS_UP_TO.length; null = no watering on record. */
 export function dryness(lastDay, today = isoDay()) {
   if (!lastDay) return null;
   const n = daysBetween(lastDay, today);
-  return Math.min(Math.max(n - GREEN_DAYS, 0), MAX_LEVEL);
+  const level = DRYNESS_UP_TO.findIndex((upTo) => n <= upTo);
+  return level === -1 ? DRYNESS_UP_TO.length : level;
+}
+
+/** Legend text per level: "0–3 j", "4–5 j", "6 j", "7 j et +". */
+export function drynessLabels() {
+  return [...DRYNESS_UP_TO, Infinity].map((upTo, i) => {
+    const from = i === 0 ? 0 : DRYNESS_UP_TO[i - 1] + 1;
+    return upTo === Infinity ? `${from} j et +` : upTo === from ? `${from} j` : `${from}–${upTo} j`;
+  });
 }
 
 /** Short day count for a map label: "auj." today, otherwise "6 j". null if never watered. */

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { addDays, daysLabel, describeDay, dryness, isoDay, knownNames, latestByZone, zoneHistory } from "./waterings.js";
+import { addDays, daysLabel, describeDay, dryness, drynessLabels, isoDay, knownNames, latestByZone, zoneHistory } from "./waterings.js";
 
 describe("days", () => {
   test("isoDay uses the local calendar day, zero-padded", () => {
@@ -58,15 +58,18 @@ test("knownNames: most used first, then alphabetical", () => {
 test.each([
   [null, null],
   ["2026-09-21", 0],   // today
-  ["2026-09-17", 0],   // 4 days ago: still green
+  ["2026-09-18", 0],   // 3 days ago: still green
+  ["2026-09-17", 1],   // 4: yellow
   ["2026-09-16", 1],   // 5
-  ["2026-09-15", 2],   // 6
-  ["2026-09-14", 3],   // 7
-  ["2026-09-13", 4],   // 8
-  ["2026-09-12", 5],   // 9: red
-  ["2025-01-01", 5],
+  ["2026-09-15", 2],   // 6: orange
+  ["2026-09-14", 3],   // 7: red
+  ["2025-01-01", 3],
 ])("dryness(%s) on 2026-09-21 → %s", (day, level) => {
   expect(dryness(day, "2026-09-21")).toBe(level);
+});
+
+test("drynessLabels", () => {
+  expect(drynessLabels()).toEqual(["0–3 j", "4–5 j", "6 j", "7 j et +"]);
 });
 
 test("zoneHistory: only that zone, most recent day first, then latest entry", () => {

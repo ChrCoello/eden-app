@@ -5,7 +5,7 @@ import { addWatering, gardenExists, watchWaterings } from "./firebase.js";
 import { area } from "./geo.js";
 import { createMap } from "./map.js";
 import {
-  addDays, daysLabel, describeDay, dryness, isoDay, knownNames, latestByZone, zoneHistory,
+  addDays, daysLabel, describeDay, dryness, drynessLabels, isoDay, knownNames, latestByZone, zoneHistory,
 } from "./waterings.js";
 import "./style.css";
 
@@ -74,6 +74,14 @@ function refresh() {
 }
 // A phone app stays open for days: "today" moves on while it's in the background.
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
+
+$("legend").prepend(...drynessLabels().map((text, level) => {
+  const li = document.createElement("li");
+  const swatch = document.createElement("i");
+  swatch.dataset.dry = level;
+  li.append(swatch, text);
+  return li;
+}));
 
 $("close").addEventListener("click", () => map.select(null));
 $("scan-toggle").addEventListener("click", (e) => {

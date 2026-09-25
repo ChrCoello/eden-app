@@ -185,7 +185,7 @@ export function createMap(svg, garden, scan, onSelect) {
 
   return {
     select,
-    /** Colour zones and caption their labels: levelOf(id) → dryness 0..5, null for "never
+    /** Colour zones and caption their labels: levelOf(id) → dryness level, null for "never
      *  watered", or "auto"; noteOf(id) → a second label line (e.g. "6 j"), or null for none. */
     setDryness(levelOf, noteOf = () => null) {
       for (const [id, shape] of byId) shape.dataset.dry = levelOf(id) ?? "never";

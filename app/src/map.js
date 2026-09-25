@@ -191,7 +191,6 @@ export function createMap(svg, garden, scan, onSelect) {
       for (const [id, shape] of byId) shape.dataset.dry = levelOf(id) ?? "never";
       for (const [id, text] of labelById) setLabel(text, id, noteOf(id));
     },
-    fit: () => fit(),
     setScanVisible: (on) => scanImg.classList.toggle("visible", on),
   };
 }

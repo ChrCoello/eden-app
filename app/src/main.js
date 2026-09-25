@@ -76,7 +76,6 @@ function refresh() {
 document.addEventListener("visibilitychange", () => { if (!document.hidden) refresh(); });
 
 $("close").addEventListener("click", () => map.select(null));
-$("fit").addEventListener("click", () => map.fit());
 $("scan-toggle").addEventListener("click", (e) => {
   const on = e.currentTarget.getAttribute("aria-pressed") !== "true";
   e.currentTarget.setAttribute("aria-pressed", on);

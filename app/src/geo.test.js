@@ -49,6 +49,6 @@ describe("garden.json", () => {
   });
 
   test.each(garden.features.map((f) => [f.properties.id, f]))("label of %s sits inside it", (_, f) => {
-    expect(contains(f.geometry, labelPoint(f.geometry))).toBe(true);
+    expect(contains(f.geometry, labelPoint(f.geometry, f.properties.label))).toBe(true);
   });
 });

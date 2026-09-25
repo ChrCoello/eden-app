@@ -28,9 +28,11 @@ export function area(geometry) {
   );
 }
 
-/** Best spot for a label, in SVG coordinates: the point deepest inside the largest part
- *  (a centroid can fall outside L-shaped zones such as A1). */
-export function labelPoint(geometry) {
+/** Best spot for a label, in SVG coordinates: `placed` ([x, y] from the feature's optional
+ *  "label" property, set by hand where the automatic spot is poor, e.g. G5's thin strip), else
+ *  the point deepest inside the largest part (a centroid can fall outside L-shaped zones such as A1). */
+export function labelPoint(geometry, placed) {
+  if (placed) return [placed[0], -placed[1]];
   const main = polygons(geometry).reduce((a, b) => (ringArea(b[0]) > ringArea(a[0]) ? b : a));
   const [x, y] = polylabel(main, 0.5);
   return [x, -y];

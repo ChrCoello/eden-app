@@ -42,6 +42,7 @@ Source: `data/20260303_154351.PDF`, a scan (6900×8827 px JPEG) of the surveyor'
 - [ ] 1.8 Open questions for the user:
   - Unlabeled areas: the big lawn north of H1/H2/G1 and the strip by the house are
     `lawn_north`/`lawn_house` (kind "lawn"). Should they be waterable zones?
+    → 2026-09-25: the strip by the house (now G6, "Pelouse" in the app) is a zone that needs watering.
   - A faint label in the top-left strip (near the house, west of H3) looks like "B5"/"A6"; it's merged into A1 for now.
 
 ## Phase 2 — The app

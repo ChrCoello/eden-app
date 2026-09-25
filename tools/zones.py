@@ -64,7 +64,8 @@ def split(fc, zid, branches):
     for j, faces in owned.items():       # neighbours: same shape, plus the corners where a line meets them
         out[j]["geometry"] = mapping(shapely.union_all(faces, grid_size=GRID))
     out[i]["geometry"] = mapping(pieces[0])
-    props = feats[i]["properties"]
+    props = {k: v for k, v in feats[i]["properties"].items() if k != "label"}   # may land in any piece
+    out[i] = {**out[i], "properties": props}
     ids = [zid] + [f"{zid}~{n}" for n in range(1, len(pieces))]
     new = [{"type": "Feature",
             "properties": {**props, "id": pid, "name": "", **({"trees": None} if "trees" in props else {})},

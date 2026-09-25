@@ -159,6 +159,7 @@ function area(f) {
   return polys(f.geometry).reduce((s, p) => s + Math.abs(ringArea(p[0])) - p.slice(1).reduce((h, r) => h + Math.abs(ringArea(r)), 0), 0);
 }
 function labelPoint(f) {
+  if (f.properties.label) return f.properties.label;   // placed by hand (garden.json)
   const outer = polys(f.geometry).map((p) => p[0]).sort((a, b) => Math.abs(ringArea(b)) - Math.abs(ringArea(a)))[0];
   let cx = 0, cy = 0, a = 0;
   for (let i = 0; i < outer.length - 1; i++) {

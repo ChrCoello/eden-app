@@ -4,7 +4,7 @@
 """Sanity-check data/garden.json and render it over the scan.
 
 Checks: valid geometries, ids unique and accepted by the Firestore rules,
-no overlaps, robinets well-formed. Gaps between zones are allowed and only listed.
+no overlaps, robinets and hand-placed labels well-formed. Gaps between zones are allowed and only listed.
 Run: uv run tools/check_garden.py [overlay.png]
 """
 import itertools
@@ -36,6 +36,12 @@ problems += [f'id "{k}" must be 1-20 letters, digits or _' for k in ids if not r
 gone = [k for k in [*seeds["zones"], *seeds["lawns"]] if k not in geoms]
 for f in fc["features"]:
     props = f["properties"]
+    if "label" in props:   # a label placed by hand: [x, y] in meters, inside its feature
+        at = props["label"]
+        if not (isinstance(at, list) and len(at) == 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) for v in at)):
+            problems.append(f'{props["id"]}: "label" must be [x, y] in meters')
+        elif not shape(f["geometry"]).contains(shapely.Point(at)):
+            problems.append(f'{props["id"]}: its "label" point is outside it')
     if props["kind"] != "zone":
         continue
     if not isinstance(props.get("auto"), bool):

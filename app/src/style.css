@@ -135,7 +135,6 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
   pointer-events: none;
 }
 .label .note { font-size: 0.85em; font-weight: 600; }
-.label.house { font-weight: 600; font-style: italic; }
 .robinet { cursor: pointer; }
 .robinet .hit { fill: transparent; }
 .robinet circle:not(.hit) { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }

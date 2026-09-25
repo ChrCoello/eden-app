@@ -173,7 +173,7 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
   - [x] Editor: "House" panel: ID (default `maison`) + "Draw a house": click the corners, Enter/double-click closes
         an outline (filled preview), Apply / Cancel; kind `house` in the Kind list, its own colour.
   - [x] App: kind `house`: slate fill (#8d96a3 / dark #6e7784, CIEDE2000 ≥ 16 from every map colour), darker
-        outline, not tappable, italic label = its name or "Maison".
+        outline, not tappable, no label (dropped: the fill says it already).
   - [x] Verify: house inside C4 / across D3, a path, chemin_D and E1 / in empty ground / 2nd building, 5 refusals,
         100 random houses: all valid, no new overlaps, the house = the outline, others lose exactly what it
         covers, nothing grows (only sub-cm slivers closed by the 1 cm snapping). Headless editor 16/16, app on a

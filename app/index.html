@@ -34,7 +34,9 @@
     </button>
   </section>
 
-  <dialog id="water-dialog">
+  <!-- autofocus: showModal() focuses the dialog, not the name field, so a prefilled name doesn't
+       pop the keyboard over the date; main.js focuses the name only when it's empty. -->
+  <dialog id="water-dialog" autofocus>
     <form id="water-form" method="dialog">
       <h3 id="water-title"></h3>
       <label for="by">Nom</label>

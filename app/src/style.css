@@ -196,6 +196,7 @@ dialog {
   box-shadow: 0 8px 40px rgb(0 0 0 / 0.3);
 }
 dialog::backdrop { background: rgb(0 0 0 / 0.4); }
+dialog:focus { outline: none; }
 dialog h3 { margin: 0 0 12px; font-size: 20px; }
 label { display: block; margin: 12px 0 4px; font-size: 14px; color: var(--muted); }
 input {

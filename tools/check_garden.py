@@ -3,11 +3,10 @@
 # ///
 """Sanity-check data/garden.json and render it over the scan.
 
-Checks: valid geometries, ids unique and accepted by the Firestore rules,
-no overlaps, robinets and hand-placed labels well-formed. Gaps between zones are allowed and only listed.
+Checks: valid geometries, ids unique and accepted by the Firestore rules, robinets and hand-placed
+labels well-formed. Overlaps between features are fine and not checked; gaps are only listed.
 Run: uv run tools/check_garden.py [overlay.png]
 """
-import itertools
 import json
 import math
 import re
@@ -59,10 +58,7 @@ for i, r in enumerate(robinets):
         problems.append(f"robinet {i + 1}: \"name\" must be text")
     if not (isinstance(at, list) and len(at) == 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in at)):
         problems.append(f"robinet {i + 1} ({r.get('name')}): \"at\" must be [x, y] in meters")
-valid = {k: g for k, g in geoms.items() if g.is_valid}   # overlap maths needs valid shapes
-for (ka, a), (kb, b) in itertools.combinations(valid.items(), 2):
-    if (area := a.intersection(b).area) > 0.05:
-        problems.append(f"overlap {ka}/{kb}: {area:.2f} m2")
+valid = {k: g for k, g in geoms.items() if g.is_valid}   # the union needs valid shapes
 union = shapely.union_all(list(valid.values()))
 # zones don't have to cover the garden: gaps are fine, listed for information only
 holes = [shapely.Polygon(r) for p in shapely.get_parts(union) for r in p.interiors]

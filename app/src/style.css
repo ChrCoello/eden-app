@@ -122,7 +122,7 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
 #drip rect { fill: var(--drip-stripe); }
 .scan.visible ~ g .drip { fill-opacity: 0.45; }
 #legend .drip {   /* -45deg: the same "/" stripes as the map's rotate(45) */
-  background: repeating-linear-gradient(-45deg, var(--drip-stripe) 0 2px, var(--drip-legend) 2px 5px) var(--drip-legend);
+  background: repeating-linear-gradient(-45deg, var(--drip-stripe) 0 1.5px, var(--drip-legend) 1.5px 6px) var(--drip-legend);
 }
 .shape.selected { stroke: var(--selected); stroke-width: 4; }
 .label {

@@ -21,6 +21,8 @@
   --dry-3: #9c1b17;   /* 7 j et + */
   --never: #c9ccc4;
   --auto: #5598e7;       /* automatic watering; validated against --never and every --dry step */
+  --drip-stripe: rgb(255 255 255 / 0.55);   /* goutte à goutte: light stripes over whatever colour */
+  --drip-legend: #7d857f;                   /* the legend's grey under them: not a dryness colour */
   --water: #2f7fd1;
   --line: #c9d3c6;
   --error: #b3261e;
@@ -116,6 +118,12 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
 .shape[data-dry="3"], #legend [data-dry="3"] { fill: var(--dry-3); background: var(--dry-3); }
 .shape[data-dry="never"], #legend [data-dry="never"] { fill: var(--never); background: var(--never); }
 .shape[data-dry="auto"], #legend [data-dry="auto"] { fill: var(--auto); background: var(--auto); }
+.drip { fill: url(#drip); pointer-events: none; }
+#drip rect { fill: var(--drip-stripe); }
+.scan.visible ~ g .drip { fill-opacity: 0.45; }
+#legend .drip {   /* -45deg: the same "/" stripes as the map's rotate(45) */
+  background: repeating-linear-gradient(-45deg, var(--drip-stripe) 0 2px, var(--drip-legend) 2px 5px) var(--drip-legend);
+}
 .shape.selected { stroke: var(--selected); stroke-width: 4; }
 .label {
   fill: var(--ink);

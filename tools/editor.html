@@ -75,6 +75,7 @@
     <label>Name</label><input id="f-name" placeholder="e.g. Section Acer">
     <div id="zone-only">
       <label><input id="f-auto" type="checkbox" style="width:auto"> Automatic watering (no manual logging)</label>
+      <label><input id="f-drip" type="checkbox" style="width:auto"> Goutte à goutte (drip line, only needs plugging in)</label>
       <label>Trees</label><input id="f-trees" type="number" min="0" step="1" placeholder="not counted yet">
     </div>
     <label>Area</label><div id="f-area"></div>
@@ -268,6 +269,7 @@ function renderPanel() {
   const isZone = p?.kind === "zone";
   $("zone-only").hidden = !isZone;
   $("f-auto").checked = isZone && p.auto === true;
+  $("f-drip").checked = isZone && p.drip === true;
   $("f-trees").value = isZone && p.trees != null ? p.trees : "";
   $("z-split").disabled = draw || !["zone", "lawn"].includes(p?.kind);
   $("z-merge").disabled = draw || !["zone", "lawn", "chemin"].includes(p?.kind);
@@ -423,12 +425,13 @@ $("f-kind").addEventListener("change", (e) => {
   snapshot();
   const p = selected.properties;
   p.kind = e.target.value;
-  if (p.kind === "zone") { p.auto ??= false; p.trees ??= null; }   // zone-only attributes
-  else { delete p.auto; delete p.trees; }
+  if (p.kind === "zone") { p.auto ??= false; p.drip ??= false; p.trees ??= null; }   // zone-only attributes
+  else { delete p.auto; delete p.drip; delete p.trees; }
   markDirty(); render();
 });
 $("f-name").addEventListener("change", (e) => { snapshot(); selected.properties.name = e.target.value.trim(); markDirty(); render(); });
 $("f-auto").addEventListener("change", (e) => { snapshot(); selected.properties.auto = e.target.checked; markDirty(); render(); });
+$("f-drip").addEventListener("change", (e) => { snapshot(); selected.properties.drip = e.target.checked; markDirty(); render(); });
 $("f-trees").addEventListener("change", (e) => {
   const v = e.target.value.trim();
   if (v !== "" && !/^\d+$/.test(v)) { status("Trees must be a whole number."); return renderPanel(); }

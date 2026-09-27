@@ -19,6 +19,7 @@
       <!-- the dryness steps are added by main.js, from DRYNESS_UP_TO -->
       <li><i data-dry="never"></i>jamais</li>
       <li><i data-dry="auto"></i>automatique</li>
+      <li><i class="drip"></i>goutte à goutte</li>
     </ul>
   </header>
   <svg id="map" role="img" aria-label="Plan du jardin"></svg>
@@ -28,6 +29,7 @@
     <p id="zone-name"></p>
     <p id="last-watering"></p>
     <ul id="history" aria-label="Arrosages précédents"></ul>
+    <p id="zone-drip" class="muted">Goutte à goutte installé : il suffit de le brancher.</p>
     <p id="zone-area" class="muted"></p>
     <button id="water" aria-label="Ajouter un arrosage" title="Ajouter un arrosage">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5C9 7 5.5 10.6 5.5 14.5a6.5 6.5 0 0 0 13 0C18.5 10.6 15 7 12 2.5Z"/></svg>

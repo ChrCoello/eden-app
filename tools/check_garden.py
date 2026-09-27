@@ -46,6 +46,8 @@ for f in fc["features"]:
         continue
     if not isinstance(props.get("auto"), bool):
         problems.append(f'{props["id"]}: "auto" must be true or false')
+    if not isinstance(props.get("drip"), bool):
+        problems.append(f'{props["id"]}: "drip" must be true or false')
     trees = props.get("trees")
     if trees is not None and not (isinstance(trees, int) and not isinstance(trees, bool) and trees >= 0):
         problems.append(f'{props["id"]}: "trees" must be a whole number >= 0, or null')

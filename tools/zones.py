@@ -103,6 +103,8 @@ def merge(fc, keep, other):
     if a["kind"] == "zone":
         if a.get("auto") != b.get("auto"):
             report.append(f"note: {other} had automatic watering {'on' if b.get('auto') else 'off'}; {keep}'s setting is kept")
+        if a.get("drip") != b.get("drip"):
+            report.append(f"note: {other} had drip {'on' if b.get('drip') else 'off'}; {keep}'s setting is kept")
         props["trees"] = a["trees"] + b["trees"] if a.get("trees") is not None and b.get("trees") is not None else None
         report.append(f"note: waterings logged on {other} stay under that id and no longer show")
     out = [dict(f) for f in feats]

@@ -49,6 +49,7 @@ function showZone(id) {
   const { kind, name } = features.get(id).properties;
   $("zone-id").textContent = zoneTitle(id);
   $("zone-name").textContent = name || (kind === "lawn" ? "" : "Pas encore de nom");
+  $("zone-drip").hidden = features.get(id).properties.drip !== true;
   $("zone-area").textContent = `${Math.round(area(features.get(id).geometry))} m²`;
   $("water").hidden = isAuto(id);
   const [last, ...previous] = isAuto(id) ? [] : zoneHistory(waterings, id);

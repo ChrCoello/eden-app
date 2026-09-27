@@ -42,14 +42,20 @@ def split(fc, zid, branches):
     cut = shapely.union_all(lines).intersection(zone.buffer(2 * GRID))
     hit = [j for j, g in enumerate(geoms) if g.distance(zone) < 5 * GRID]
     edges = shapely.union_all([geoms[j].boundary for j in hit] + [cut], grid_size=GRID)
-    owned, pieces = {}, []
+    # Only the lines decide the pieces: the neighbours' borders just add corners, and where the zone
+    # overlaps a neighbour they would otherwise chop the overlap into extra slivers of pieces.
+    cells = [c for c in shapely.get_parts(shapely.polygonize(shapely.get_parts(
+        shapely.union_all([zone.boundary, cut], grid_size=GRID)))) if zone.contains(c.representative_point())]
+    owned, groups = {}, {}
     for face in shapely.get_parts(shapely.polygonize(shapely.get_parts(edges))):
         p = face.representative_point()
-        owner = next((j for j in hit if geoms[j].contains(p)), None)
-        if owner == i:
-            pieces.append(face)
-        elif owner is not None:
-            owned.setdefault(owner, []).append(face)
+        for j in hit:                    # a face in an overlap stays in every feature that covers it
+            if geoms[j].contains(p):
+                owned.setdefault(j, []).append(face)
+        if i in owned and owned[i][-1] is face:
+            groups.setdefault(min(range(len(cells)), key=lambda k: cells[k].distance(p)), []).append(face)
+    owned.pop(i, None)
+    pieces = [shapely.union_all(faces, grid_size=GRID) for faces in groups.values()]
     pieces = sorted([q for q in pieces if q.area > 0], key=lambda q: -q.area)
     while len(pieces) > 1 and pieces[-1].area < 0.05:        # hairline sliver from snapping: join a neighbour
         s = pieces.pop()

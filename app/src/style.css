@@ -15,10 +15,10 @@
   --selected: var(--ink);   /* visible on every fill: orange, grey and the automatic blue */
   /* days since watering, one colour per level of DRYNESS_UP_TO (waterings.js): green → yellow →
      orange → red. Map labels always give the day count too, whatever your colour vision. */
-  --dry-0: #2f9140;   /* 0–3 j */
-  --dry-1: #f7c21a;   /* 4–5 j */
-  --dry-2: #d4461c;   /* 6 j */
-  --dry-3: #9c1b17;   /* 7 j et + */
+  --dry-0: #2f9140;   /* 0–14 j */
+  --dry-1: #f7c21a;   /* 15–17 j */
+  --dry-2: #d4461c;   /* 18–20 j */
+  --dry-3: #9c1b17;   /* 21 j et + */
   --never: #c9ccc4;
   --auto: #5598e7;       /* automatic watering; validated against --never and every --dry step */
   --drip-stripe: rgb(255 255 255 / 0.55);   /* goutte à goutte: light stripes over whatever colour */

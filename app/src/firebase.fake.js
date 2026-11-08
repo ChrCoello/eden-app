@@ -3,7 +3,7 @@
 import { addDays, isoDay } from "./waterings.js";
 
 // Sample waterings so every colour shows at once: [zone, days ago].
-const waterings = [["E1", 1], ["E2", 4], ["E3", 5], ["E4", 6], ["F2", 7], ["F4", 8], ["G3", 12], ["F1", 2]]
+const waterings = [["E1", 1], ["E2", 15], ["E3", 17], ["E4", 18], ["F2", 20], ["F4", 21], ["G3", 30], ["F1", 2]]
   .map(([zone, n]) => ({ zone, by: "Démo", day: addDays(isoDay(), -n), at: new Date() }));
 const listeners = new Set();
 const delay = () => new Promise((r) => setTimeout(r, 50));

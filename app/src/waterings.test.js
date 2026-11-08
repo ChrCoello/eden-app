@@ -58,18 +58,19 @@ test("knownNames: most used first, then alphabetical", () => {
 test.each([
   [null, null],
   ["2026-09-21", 0],   // today
-  ["2026-09-18", 0],   // 3 days ago: still green
-  ["2026-09-17", 1],   // 4: yellow
-  ["2026-09-16", 1],   // 5
-  ["2026-09-15", 2],   // 6: orange
-  ["2026-09-14", 3],   // 7: red
+  ["2026-09-07", 0],   // 14 days ago: still green
+  ["2026-09-06", 1],   // 15: yellow
+  ["2026-09-04", 1],   // 17
+  ["2026-09-03", 2],   // 18: orange
+  ["2026-09-01", 2],   // 20
+  ["2026-08-31", 3],   // 21: red
   ["2025-01-01", 3],
 ])("dryness(%s) on 2026-09-21 → %s", (day, level) => {
   expect(dryness(day, "2026-09-21")).toBe(level);
 });
 
 test("drynessLabels", () => {
-  expect(drynessLabels()).toEqual(["0–3 j", "4–5 j", "6 j", "7 j et +"]);
+  expect(drynessLabels()).toEqual(["0–14 j", "15–17 j", "18–20 j", "21 j et +"]);
 });
 
 test("zoneHistory: only that zone, most recent day first, then latest entry", () => {

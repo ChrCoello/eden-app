@@ -58,6 +58,16 @@ for i, r in enumerate(robinets):
         problems.append(f"robinet {i + 1}: \"name\" must be text")
     if not (isinstance(at, list) and len(at) == 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in at)):
         problems.append(f"robinet {i + 1} ({r.get('name')}): \"at\" must be [x, y] in meters")
+# irrigation lines: polylines next to the features, [{"name": str, "points": [[x, y], ...]}]
+irrigation = fc.get("irrigation", [])
+for i, line in enumerate(irrigation):
+    points = line.get("points")
+    if not isinstance(line.get("name"), str):
+        problems.append(f"irrigation line {i + 1}: \"name\" must be text")
+    if not (isinstance(points, list) and len(points) >= 2 and all(
+            isinstance(p, list) and len(p) == 2 and all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in p)
+            for p in points)):
+        problems.append(f"irrigation line {i + 1} ({line.get('name')}): \"points\" must be 2 or more [x, y] in meters")
 valid = {k: g for k, g in geoms.items() if g.is_valid}   # the union needs valid shapes
 union = shapely.union_all(list(valid.values()))
 # zones don't have to cover the garden: gaps are fine, listed for information only
@@ -67,7 +77,7 @@ if (n := len(shapely.get_parts(union))) > 1:
     notes.append(f"the zones form {n} separate pieces")
 
 zones = [g for f, g in zip(fc["features"], geoms.values()) if f["properties"]["kind"] == "zone"]
-print(f"{len(zones)} zones, {len(geoms)} features, {len(robinets)} robinets, garden {union.area:.0f} m2, "
+print(f"{len(zones)} zones, {len(geoms)} features, {len(robinets)} robinets, {len(irrigation)} irrigation lines, garden {union.area:.0f} m2, "
       f"{sum(len(shapely.get_coordinates(g)) for g in geoms.values())} vertices")
 for note in notes:
     print(f"note: {note}")
@@ -91,5 +101,7 @@ if len(sys.argv) > 1:
         (px, py), = to_px([r["at"]])
         draw.ellipse((px - 5, py - 5, px + 5, py + 5), fill="deepskyblue", outline="black")
         draw.text((px + 7, py - 5), r["name"], fill="navy")
+    for line in irrigation:
+        draw.line(to_px(line["points"]), fill="deepskyblue", width=3)
     im.save(sys.argv[1])
 sys.exit(1 if problems else 0)

@@ -183,12 +183,23 @@ gardens/{gardenCode}/waterings/{autoId}   { zone: "B3", by: "Papa", day: "2026-0
         every shapely tool (chemin, split, merge, house) crash on the whole file. Snapped G5's corner onto it.
   - [ ] (User) Draw the real house in the editor, Save.
 
+- [x] Main irrigation lines (2026-11-08): `irrigation` list next to `robinets` in `garden.json`.
+  - [x] Editor: "Draw a line", select, move/add/delete points, rename, delete, undo, save.
+  - [x] App: "Irrigation" button beside "Plan", off by default; lines don't block taps on zones.
+  - [x] `check_garden.py` validates the lines and draws them on the overlay.
+  - [x] Verify: headless editor and app checks on a copy of the data, vitest 76/76, build.
+  - [ ] (User) Draw the real lines in the editor, Save.
+
 ### Later (not in the first version)
 
 - Multi-select: tick several zones, then "Watered all".
 - Notes/photos per watering, reminders, GPS "you are here".
 
 ## Review
+
+Irrigation lines (2026-11-08): browser checks caught two editor bugs unit tests can't reach (a crash on every
+click while drawing; re-rendering on click broke double-click), and the screenshot showed `--water` was invisible
+on "auto" zones, so the line uses a darker blue.
 
 Phase 2.10 (2026-09-23): the first carve used per-face rounding to cm and failed on real clicks
 (GEOS TopologyException on a sliver); fixed by snap-rounding the whole arrangement once (`grid_size`).

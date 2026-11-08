@@ -136,6 +136,9 @@ header button[aria-pressed="true"] { background: rgb(255 255 255 / 0.25); }
   pointer-events: none;
 }
 .label .note { font-size: 0.85em; font-weight: 600; }
+.pipe, .pipe-casing { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; pointer-events: none; }
+.pipe-casing { stroke: #fff; stroke-width: 5; }
+.pipe { stroke: #0b3d91; stroke-width: 3; }   /* darker than --water, which is close to the "auto" zone colour */
 .robinet { cursor: pointer; }
 .robinet .hit { fill: transparent; }
 .robinet circle:not(.hit) { fill: var(--surface); stroke: var(--ink); stroke-width: 1.5; }

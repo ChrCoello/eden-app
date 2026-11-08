@@ -17,9 +17,9 @@
   button { cursor: pointer; margin-top: 6px; }
   #save.dirty { background: var(--accent); font-weight: 600; }
   #status { margin-top: 6px; font-size: 12px; color: var(--muted); min-height: 1em; }
-  #list, #r-list { display: flex; flex-wrap: wrap; gap: 3px; }
-  #list button, #r-list button { flex: 1 0 48px; width: auto; margin: 0; padding: 3px 4px; font-size: 12px; }
-  #list button.sel, #r-list button.sel { outline: 2px solid var(--accent); }
+  #list, #r-list, #l-list { display: flex; flex-wrap: wrap; gap: 3px; }
+  #list button, #r-list button, #l-list button { flex: 1 0 48px; width: auto; margin: 0; padding: 3px 4px; font-size: 12px; }
+  #list button.sel, #r-list button.sel, #l-list button.sel { outline: 2px solid var(--accent); }
   .help { font-size: 12px; color: var(--muted); line-height: 1.5; }
   .help b { color: var(--ink); }
   .cell { vector-effect: non-scaling-stroke; stroke: #c00; stroke-width: 1.2; cursor: pointer; }
@@ -47,11 +47,16 @@
   .rob.sel circle:first-child { stroke: var(--accent); stroke-width: 3; }
   .rob text { font-weight: 700; font-size: 13px; fill: #1f5fbf; paint-order: stroke; stroke: #fff; stroke-width: 3; text-anchor: middle; pointer-events: none; }
   #map.adding { cursor: crosshair; }
+  .pipe polyline { fill: none; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+  .pipe .hit { stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+  .pipe .line { stroke: #1f5fbf; stroke-width: 3; pointer-events: none; }
+  .pipe.sel .line { stroke: var(--accent); }
+  #map.drawing .pipe .hit, #map.merging .pipe .hit, #map.adding .pipe .hit { pointer-events: none; }
   .box { fill: rgba(230, 0, 0, .08); stroke: #e00; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
 </style>
 </head>
 <body>
-<svg id="map"><g id="view"><image id="scan" href="../data/map.jpg"/><g id="cells"></g><g id="labels"></g><g id="robinets"></g><g id="handles"></g><g id="draft"></g></g></svg>
+<svg id="map"><g id="view"><image id="scan" href="../data/map.jpg"/><g id="cells"></g><g id="pipes"></g><g id="labels"></g><g id="robinets"></g><g id="handles"></g><g id="draft"></g></g></svg>
 <aside>
   <h1>Garden zone editor</h1>
   <button id="save">Save</button>
@@ -104,6 +109,14 @@
   </div>
   <div id="r-list"></div>
 
+  <h2>Irrigation</h2>
+  <button id="l-draw">Draw a line</button>
+  <div id="pipe-line" hidden>
+    <label>Name</label><input id="l-name" placeholder="e.g. Ligne principale nord" autocomplete="off">
+    <button id="l-delete">Delete this line</button>
+  </div>
+  <div id="l-list"></div>
+
   <h2>View</h2>
   <label>Scan opacity</label><input id="opacity" type="range" min="0" max="1" step="0.05" value="0.8">
   <label><input id="show-labels" type="checkbox" checked style="width:auto"> labels</label>
@@ -127,6 +140,8 @@
     Needs <code>uv run tools/serve.py</code>. Drawing again with the same ID adds a building<br>
     <b>Robinet</b> (water tap) "Add a robinet", click where it is, type its name. Drag it to move it;
     select it, then Delete to remove it<br>
+    <b>Irrigation line</b> "Draw a line", click along it, Enter between lines, Apply. Click a line to select it,
+    then drag a point to move it, double-click the line to add a point, shift-click a point to delete it, Delete to remove the line<br>
     <b>Undo</b> Ctrl+Z<br>
     Big mistakes: move the seed in <code>data/zone_seeds.json</code> and re-run
     <code>uv run tools/segment_zones.py</code> instead.
@@ -139,6 +154,7 @@ const NS = "http://www.w3.org/2000/svg";
 let fc, px_per_m, selected = null, dirty = false, undo = [];
 let picked = new Set();                           // keys of corners picked with the box
 let selRob = null, adding = false;                // selected robinet ({name, at}); placing a new one
+let selLine = null;                               // selected irrigation line ({name, points})
 let k = 1, tx = 0, ty = 0;                        // screen px per meter, pan offset
 let scanW, scanH;                                 // scan size in meters
 
@@ -211,11 +227,21 @@ function render() {
     }
   }
   if (selected) cells.append(cells.querySelector(".sel"));     // selected on top
-  renderRobinets(); renderHandles(); renderList(); renderPanel(); applyView();
+  renderPipes(); renderRobinets(); renderHandles(); renderList(); renderPanel(); applyView();
 }
 function renderHandles() {
   const g = $("handles");
   g.replaceChildren();
+  if (selLine) {
+    selLine.points.forEach(([x, y], i) => {
+      const c = document.createElementNS(NS, "circle");
+      c.setAttribute("cx", x); c.setAttribute("cy", -y); c.setAttribute("r", 5 / k);
+      c.setAttribute("class", "handle");
+      c.dataset.pt = i;
+      g.append(c);
+    });
+    return;
+  }
   if (!selected) return;
   const seen = new Set();
   for (const r of rings(selected)) for (const p of r) {
@@ -260,6 +286,29 @@ function renderRobinets() {
     return b;
   }));
 }
+function renderPipes() {
+  $("pipes").replaceChildren(...fc.irrigation.map((l) => {
+    const g = document.createElementNS(NS, "g");
+    g.setAttribute("class", "pipe" + (l === selLine ? " sel" : ""));
+    g.__l = l;
+    for (const cls of ["hit", "line"]) {
+      const n = document.createElementNS(NS, "polyline");
+      n.setAttribute("class", cls);
+      n.setAttribute("points", pipePoints(l));
+      g.append(n);
+    }
+    g.addEventListener("click", () => { if (!moved && !draw && l !== selLine) selectLine(l); });   // no re-render: it would break a double-click
+    return g;
+  }));
+  $("l-list").replaceChildren(...fc.irrigation.map((l) => {
+    const b = document.createElement("button");
+    b.textContent = l.name || "(no name)";
+    if (l === selLine) b.className = "sel";
+    b.onclick = () => { selectLine(l); centerAt(l.points[l.points.length >> 1]); };
+    return b;
+  }));
+}
+function pipePoints(l) { return l.points.map(([x, y]) => `${x},${-y}`).join(" "); }
 function renderPanel() {
   const p = selected?.properties;
   for (const [id, field] of [["f-id", "id"], ["f-kind", "kind"], ["f-name", "name"]]) {
@@ -275,6 +324,8 @@ function renderPanel() {
   $("z-merge").disabled = draw || !["zone", "lawn", "chemin"].includes(p?.kind);
   $("robinet").hidden = !selRob;
   $("r-name").value = selRob?.name ?? "";
+  $("pipe-line").hidden = !selLine;
+  $("l-name").value = selLine?.name ?? "";
   $("r-add").className = adding ? "dirty" : "";
   $("save").className = dirty ? "dirty" : "";
 }
@@ -323,6 +374,11 @@ svg.addEventListener("mousedown", (e) => {
   const rob = !draw && e.target.closest(".rob");
   if (rob) { selectRobinet(rob.__r); snapshot(); drag = { rob: rob.__r }; return; }
   const h = !draw && e.target.closest(".handle");
+  if (h && h.dataset.pt != null) {
+    const i = Number(h.dataset.pt);
+    if (e.shiftKey) return deletePipePoint(i);
+    snapshot(); drag = { pipePt: i, el: h }; return;
+  }
   if (h && e.shiftKey) return deleteVertices([h.dataset.key]);
   if (e.shiftKey && selected && !draw) {
     const box = document.createElementNS(NS, "rect");
@@ -340,6 +396,12 @@ window.addEventListener("mousemove", (e) => {
   moved = true;
   if (drag.pan) { tx = e.clientX - drag.x; ty = e.clientY - drag.y; return applyView(); }
   if (drag.rob) { drag.rob.at = toWorld(e).map(r2); return applyView(); }
+  if (drag.pipePt != null) {
+    const [x, y] = selLine.points[drag.pipePt] = toWorld(e).map(r2);
+    drag.el.setAttribute("cx", x); drag.el.setAttribute("cy", -y);
+    for (const g of $("pipes").children) for (const n of g.children) n.setAttribute("points", pipePoints(g.__l));
+    return;
+  }
   if (drag.box) {
     const [[x0, y0], [x1, y1]] = [drag.start, toWorld(e)];
     drag.end = [x1, y1];
@@ -355,12 +417,13 @@ window.addEventListener("mousemove", (e) => {
 window.addEventListener("mouseup", (e) => {
   if (draw && drag?.pan && !moved) addPoint(toWorld(e));
   if (drag?.box) { pickInBox(drag.start, drag.end ?? drag.start); drag.box.remove(); }
-  else if (drag?.rob) { if (moved) markDirty(); else undo.pop(); render(); }   // a plain click only selects
+  else if (drag?.rob || drag?.pipePt != null) { if (moved) markDirty(); else undo.pop(); render(); }   // a plain click only selects
   else if (drag && !drag.pan) { markDirty(); render(); }
   drag = null; svg.classList.remove("panning");
 });
 svg.addEventListener("dblclick", (e) => {
   if (draw) return endBranch();
+  if (selLine) return addPipePoint(toWorld(e));
   if (!selected) return;
   const p = toWorld(e);
   let best = null;
@@ -412,7 +475,7 @@ function segDist([px, py], [ax, ay], [bx, by]) {
 function redrawCells() {
   for (const el of $("cells").children) el.setAttribute("d", pathD(el.__f));
 }
-function select(f) { selected = f; selRob = null; picked = new Set(); render(); }
+function select(f) { selected = f; selRob = null; selLine = null; picked = new Set(); render(); }
 
 // panel edits
 $("f-id").addEventListener("change", (e) => {
@@ -441,7 +504,7 @@ $("opacity").addEventListener("input", (e) => ($("scan").style.opacity = e.targe
 $("show-labels").addEventListener("change", applyView);
 
 // ---- robinets: water taps at single points, only shown on the map --------------------------
-function selectRobinet(r) { selected = null; selRob = r; picked = new Set(); render(); }
+function selectRobinet(r) { selected = null; selRob = r; selLine = null; picked = new Set(); render(); }
 function stopAdding() { adding = false; svg.classList.remove("adding"); renderPanel(); }
 function addRobinet(p) {
   snapshot();
@@ -465,6 +528,32 @@ $("r-add").onclick = () => {
 $("r-name").addEventListener("change", (e) => { snapshot(); selRob.name = e.target.value.trim(); markDirty(); render(); });
 $("r-delete").onclick = deleteRobinet;
 
+// ---- irrigation lines: polylines shown on the map only, not cut into the zones -------------
+function selectLine(l) { selected = null; selRob = null; selLine = l; picked = new Set(); render(); }
+function addPipePoint(p) {
+  const pts = selLine.points;
+  let best = null;
+  for (let i = 0; i + 1 < pts.length; i++) {
+    const d = segDist(p, pts[i], pts[i + 1]);
+    if (!best || d < best.d) best = { d, i };
+  }
+  if (best.d * k > 12) return;
+  snapshot(); pts.splice(best.i + 1, 0, p.map(r2)); markDirty(); render();
+}
+function deletePipePoint(i) {
+  if (selLine.points.length <= 2) return status("A line needs at least 2 points: delete the line instead.");
+  snapshot(); selLine.points.splice(i, 1); markDirty(); render();
+}
+function deleteLine() {
+  snapshot();
+  fc.irrigation.splice(fc.irrigation.indexOf(selLine), 1);
+  status(`Deleted ${selLine.name || "the line"}.`);
+  selLine = null; markDirty(); render();
+}
+$("l-draw").onclick = () => startDraw("irrigation");
+$("l-name").addEventListener("change", (e) => { snapshot(); selLine.name = e.target.value.trim(); markDirty(); render(); });
+$("l-delete").onclick = deleteLine;
+
 // ---- drawing lines: a chemin's middle lines (carved) or the cut lines of a split ---------
 // Geometry is done by tools/serve.py (shapely); the editor only draws and shows the result.
 let draw = null;                                  // {mode: "chemin"|"split", branches: [[x, y]...][]}; last = current
@@ -472,6 +561,7 @@ const HELP = {
   chemin: `Click along the <b>middle</b> of the chemin, and end each line on the gravel path.`,
   split: `Click a line <b>across</b> the zone, from border to border (a bit past is fine). Two lines make 3 zones.`,
   house: `Click the house's <b>corners</b> in order around it. The outline closes by itself; draw another one for a second building.`,
+  irrigation: `Click along the irrigation line, point by point.`,
 };
 function startDraw(mode) {
   stopMerge(); stopAdding();
@@ -524,13 +614,19 @@ function applyResult(out, selectId) {
   snapshot();
   fc = out.garden;
   selected = fc.features.find((f) => f.properties.id === selectId) ?? null;
-  selRob = null;
+  selRob = null; selLine = null;
   markDirty(); render();
   $("report").replaceChildren(...out.report.map((line) => Object.assign(document.createElement("div"), { textContent: line })));
 }
 async function applyDraw() {
   const branches = draw.branches.filter((b) => b.length >= 2);
-  if (draw.mode === "house") {
+  if (draw.mode === "irrigation") {
+    if (!branches.length) return status("Click at least 2 points first.");
+    snapshot();
+    for (const points of branches) fc.irrigation.push({ name: `Ligne ${fc.irrigation.length + 1}`, points });
+    stopDraw(); selectLine(fc.irrigation.at(-1)); markDirty();
+    status(`Added ${branches.length} line(s): check, rename, then Save.`);
+  } else if (draw.mode === "house") {
     const id = $("h-id").value.trim();
     const out = await post("/house", { outlines: draw.branches.filter((b) => b.length >= 3), id });
     if (!out) return;
@@ -610,7 +706,7 @@ async function mergeWith(f) {
 
 // ---- undo / save -----------------------------------------------------------------------
 function snapshot() {
-  undo.push({ json: JSON.stringify(fc), sel: selected && fc.features.indexOf(selected), rob: selRob && fc.robinets.indexOf(selRob) });
+  undo.push({ json: JSON.stringify(fc), sel: selected && fc.features.indexOf(selected), rob: selRob && fc.robinets.indexOf(selRob), line: selLine && fc.irrigation.indexOf(selLine) });
   if (undo.length > 100) undo.shift();
 }
 window.addEventListener("keydown", (e) => {
@@ -625,11 +721,13 @@ window.addEventListener("keydown", (e) => {
     const s = undo.pop();
     fc = JSON.parse(s.json); selected = s.sel == null ? null : fc.features[s.sel]; picked = new Set();
     selRob = s.rob == null ? null : fc.robinets[s.rob];
+    selLine = s.line == null ? null : fc.irrigation[s.line];
     stopNaming();
     markDirty(); render();
   }
   if ((e.key === "Delete" || e.key === "Backspace") && picked.size && document.activeElement.tagName !== "INPUT") { e.preventDefault(); deleteVertices(picked); }
   else if ((e.key === "Delete" || e.key === "Backspace") && selRob && document.activeElement.tagName !== "INPUT") { e.preventDefault(); deleteRobinet(); }
+  else if ((e.key === "Delete" || e.key === "Backspace") && selLine && document.activeElement.tagName !== "INPUT") { e.preventDefault(); deleteLine(); }
   if (e.key === "Escape") {
     if (adding) { stopAdding(); status(""); }
     else if (picked.size) { picked = new Set(); status(""); renderHandles(); }
@@ -651,6 +749,7 @@ window.addEventListener("beforeunload", (e) => { if (dirty) e.preventDefault(); 
 (async () => {
   [fc, { px_per_m }] = await Promise.all(["garden.json", "calibration.json"].map((f) => fetch(`../data/${f}`).then((r) => r.json())));
   fc.robinets ??= [];                             // [{name, at: [x, y]}], next to the features
+  fc.irrigation ??= [];                           // [{name, points: [[x, y], ...]}], next to the features
   const img = new Image();
   img.src = "../data/map.jpg";
   await img.decode();

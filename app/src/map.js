@@ -33,6 +33,13 @@ export function createMap(svg, garden, scan, onSelect) {
   const scanImg = el("image", { href: scan.url, width: scan.width, height: scan.height, class: "scan" }, view);
   const shapes = el("g", {}, view);
   const drips = el("g", {}, view);   // above every zone colour, under the robinets and labels
+  // Main irrigation lines, off until the header button shows them. Taps go through to the zones underneath.
+  const pipes = el("g", { display: "none" }, view);
+  for (const { points } of garden.irrigation ?? []) {
+    const d = points.map(([x, y]) => `${x},${-y}`).join(" ");
+    el("polyline", { points: d, class: "pipe-casing" }, pipes);
+    el("polyline", { points: d, class: "pipe" }, pipes);
+  }
   // Robinets (water taps): an icon drawn in screen pixels, so each is scaled by 1 / k in apply(); under the
   // zone labels (which carry the day counts). A tap shows the name in a bubble, drawn above everything.
   const taps = el("g", {}, view);
@@ -202,5 +209,6 @@ export function createMap(svg, garden, scan, onSelect) {
       for (const [id, text] of labelById) setLabel(text, id, noteOf(id));
     },
     setScanVisible: (on) => scanImg.classList.toggle("visible", on),
+    setIrrigationVisible: (on) => pipes.setAttribute("display", on ? "inline" : "none"),
   };
 }

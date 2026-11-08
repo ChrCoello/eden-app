@@ -85,11 +85,13 @@ $("legend").prepend(...drynessLabels().map((text, level) => {
 }));
 
 $("close").addEventListener("click", () => map.select(null));
-$("scan-toggle").addEventListener("click", (e) => {
-  const on = e.currentTarget.getAttribute("aria-pressed") !== "true";
-  e.currentTarget.setAttribute("aria-pressed", on);
-  map.setScanVisible(on);
-});
+for (const [button, setVisible] of [["scan-toggle", map.setScanVisible], ["irrigation-toggle", map.setIrrigationVisible]]) {
+  $(button).addEventListener("click", (e) => {
+    const on = e.currentTarget.getAttribute("aria-pressed") !== "true";
+    e.currentTarget.setAttribute("aria-pressed", on);
+    setVisible(on);
+  });
+}
 
 // ---- adding a watering ------------------------------------------------------------------
 const dialog = $("water-dialog");

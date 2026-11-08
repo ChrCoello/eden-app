@@ -58,6 +58,7 @@ In the editor:
 | Merge zones | select one, "Merge with…", click its neighbour (the first keeps its ID) |
 | House | "Draw a house", click its corners in order, Apply |
 | Robinet (tap) | "Add a robinet", click where it is, name it; drag to move, Delete to remove |
+| Irrigation line | "Draw a line", click along it, Apply; click a line to select it, drag points, double-click to add one, shift-click to delete one, Delete to remove the line |
 | Undo | Ctrl+Z |
 
 After editing, check the result:
